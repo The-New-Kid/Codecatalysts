@@ -1,0 +1,38 @@
+{% extends "user_layout.html" %}
+{% block title %}Ticket Confirmation{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">🎟️ Ticket Confirmation</h2>
+
+  <div class="row justify-content-center">
+    {% for ticket in tickets %}
+    <div class="col-md-6 col-lg-4 mb-4">
+      <div class="card shadow-sm border rounded-4">
+        <div class="card-body text-center">
+          <h5 class="card-title">Ticket ID: {{ ticket.id }}</h5>
+          <p><strong>Passenger:</strong> {{ loop.index }} - {{ ticket.user.name }}</p>
+          <p><strong>Slot:</strong> {{ ticket.slot.slot_type }} | {{ ticket.slot.start_time.strftime('%H:%M') }} - {{ ticket.slot.end_time.strftime('%H:%M') }}</p>
+
+          {% if ticket.qr_code %}
+          <img src="{{ url_for('static', filename='qrcode/' + ticket.qr_code) }}"
+               alt="QR Code for Ticket {{ ticket.id }}"
+               class="img-fluid border rounded-3 p-2"
+               style="max-width: 200px;">
+          {% else %}
+          <p class="text-danger">QR Code not generated</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if parking_lot_id %}
+  <div class="alert alert-info mt-4 text-center">
+    🚗 Parking reserved in Lot ID: {{ parking_lot_id }}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+

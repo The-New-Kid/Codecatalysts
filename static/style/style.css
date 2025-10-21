@@ -1,0 +1,96 @@
+
+#outer {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(to right, #e0eafc, #2575e4);
+}
+#form-body {
+  width: 400px;
+  padding: 30px;
+  background-color: #f8f4f4;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.home-container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(to right, #74ebd5, #9face6);
+}
+.home-box {
+  background-color: #ffffff;
+  padding: 40px 30px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  width: 420px;
+}
+.home-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #100202;
+}
+.home-subtext {
+  font-size: 1.1rem;
+  color: #555;
+  margin-top: 10px;
+}
+
+.header-bar {
+  background-color: #ecf0ed;
+  border-bottom: 2px solid #a3d2ca;
+}
+
+.welcome-text {
+  font-weight: 600;
+  font-size: 18px;
+  color: #3e0ddf;
+}
+
+.btn-outline-success.btn-sm {
+  border-width: 2px;
+  font-weight: 500;
+}
+
+.parking-lot-box {
+  border: 1px solid #b5b8bb;
+  border-radius: 1px;
+  background-color: #ffffff;
+}
+
+.spot-grid {
+  display:grid;
+  grid-template-columns: repeat(5, 30px);
+  gap: 10px;
+}
+
+.spot {
+  width: 30px;
+  height: 30px;
+  text-align: center;
+  line-height: 30px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 14px;
+}
+.spot.available {
+  background-color: #07fa07;
+  color: #0b0b0b;
+}
+.spot.occupied {
+  background-color: rgb(243, 10, 10);
+  color: #000;
+}
+.spot.extra {      /* 20% extra accommodation */
+  background-color: #b0b0b0; /* grey */
+  color: #000;
+}
+
+.spot.vip {        /* 20% VIP spots */
+  background-color: #ff69b4; /* pink */
+  color: #000;
+}

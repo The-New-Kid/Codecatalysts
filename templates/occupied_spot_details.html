@@ -1,0 +1,56 @@
+{% extends "admin_layout.html" %}
+{% block title %}Occupied Spot Details{% endblock %}
+
+{% block content %}
+<div class="flex justify-center mt-12 px-4">
+  <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg" data-aos="fade-up">
+    
+    <!-- Heading -->
+    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8" data-aos="fade-down">
+      Occupied Parking Spot Details
+    </h2>
+
+    <!-- Spot Details -->
+    <div class="space-y-4 text-gray-700">
+      <div class="flex justify-between">
+        <span class="font-semibold">Spot ID:</span>
+        <span>{{ spot.id }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="font-semibold">Customer ID:</span>
+        <span>{{ user.id }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="font-semibold">Customer Name:</span>
+        <span>{{ user.name }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="font-semibold">Vehicle Number:</span>
+        <span>{{ reservation.vehicle_number }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="font-semibold">Date/Time of Parking:</span>
+        <span>{{ reservation.parking_timestamp.strftime('%d/%m/%Y %I:%M %p') }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="font-semibold">Estimated Parking Cost (₹/hr):</span>
+        <span>{{ reservation.cost_per_hour }}</span>
+      </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="flex justify-center mt-8">
+      <a href="{{ url_for('admin_dashboard') }}" 
+         class="px-6 py-3 bg-gray-300 text-gray-800 font-semibold rounded-2xl shadow hover:bg-gray-400 transition">
+        Back to Dashboard
+      </a>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script>
+  AOS.init({ duration: 800, easing: 'ease-in-out', once: true });
+</script>
+{% endblock %}

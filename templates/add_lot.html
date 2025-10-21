@@ -1,0 +1,59 @@
+{% extends "admin_layout.html" %}
+{% block title %}Add Parking Lot{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto mt-10 relative z-10" data-aos="fade-up">
+  <div class="bg-white shadow-xl rounded-2xl p-6">
+    <h2 class="text-2xl font-bold text-indigo-700 text-center mb-6">🅿️ New Parking Lot</h2>
+    
+    <form method="POST" class="space-y-4">
+      
+      <!-- Prime Location -->
+      <div>
+        <label class="block text-gray-700 font-medium mb-1 text-sm">Prime Location Name</label>
+        <input type="text" name="prime_location_name" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition text-sm">
+      </div>
+
+      <!-- Address -->
+      <div>
+        <label class="block text-gray-700 font-medium mb-1 text-sm">Address</label>
+        <textarea name="address" rows="2" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition text-sm"></textarea>
+      </div>
+
+      <!-- Row for Pin Code, Price & Max Spots -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-gray-700 font-medium mb-1 text-sm">Pin Code</label>
+          <input type="number" name="pin_code" required
+            class="w-full px-2 py-1 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm">
+        </div>
+        <div>
+          <label class="block text-gray-700 font-medium mb-1 text-sm">Price (per hr)</label>
+          <input type="number" step="0.01" name="price_per_hour" required
+            class="w-full px-2 py-1 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm">
+        </div>
+        <div>
+          <label class="block text-gray-700 font-medium mb-1 text-sm">Max Spots</label>
+          <input type="number" name="max_spots" required
+            class="w-full px-2 py-1 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm">
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="flex justify-between items-center pt-3">
+        <button type="submit"
+          class="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded-xl shadow-md transition text-sm">
+          Add Lot
+        </button>
+        <a href="{{ url_for('admin_dashboard') }}"
+          class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-5 py-2 rounded-xl transition text-sm">
+          Cancel
+        </a>
+      </div>
+      
+    </form>
+  </div>
+</div>
+{% endblock %}

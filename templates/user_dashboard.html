@@ -1,0 +1,82 @@
+{% extends "user_layout.html" %}
+{% block title %}User Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+  <!-- Welcome Card -->
+  <div class="bg-white rounded-2xl shadow-lg p-6 text-center hover:shadow-2xl transition duration-300" data-aos="fade-up">
+    <h2 class="text-3xl font-extrabold text-indigo-700 mb-2">Welcome, {{ user.name }}!</h2>
+    <p class="text-gray-600">Here’s a quick overview of your recent parking activity.</p>
+  </div>
+
+  <!-- Recent Parking History -->
+  <div class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition duration-300" data-aos="fade-up">
+    <h3 class="text-xl font-semibold mb-4 text-gray-700">🚗 Recent Parking History</h3>
+    <div class="overflow-x-auto">
+      <table class="min-w-full table-auto border-collapse">
+        <thead class="bg-indigo-600 text-white rounded-t-xl">
+          <tr>
+            <th class="px-4 py-2 text-left">Prime Location</th>
+            <th class="px-4 py-2 text-left">Vehicle Number</th>
+            <th class="px-4 py-2 text-left">Start Time</th>
+            <th class="px-4 py-2 text-left">End Time</th>
+            <th class="px-4 py-2 text-left">Cost/hr</th>
+            <th class="px-4 py-2 text-left">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {% for r in reservations %}
+          <tr class="hover:bg-gray-50 transition">
+            <td class="px-4 py-2">
+              <span class="font-semibold">{{ r.spot.lot.prime_location_name }}</span><br>
+              <small class="text-gray-500">{{ r.spot.lot.address }}</small>
+            </td>
+            <td class="px-4 py-2">{{ r.vehicle_number if r.vehicle_number else "N/A" }}</td>
+            <td class="px-4 py-2">{{ r.parking_timestamp.strftime("%d-%m-%Y %I:%M %p") }}</td>
+            <td class="px-4 py-2">
+              {% if r.leaving_timestamp %}
+                {{ r.leaving_timestamp.strftime("%d-%m-%Y %I:%M %p") }}
+              {% else %}
+                <span class="inline-block px-2 py-1 bg-yellow-300 text-yellow-900 rounded-full text-sm">Ongoing</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-2">₹{{ r.cost_per_hour }}</td>
+            <td class="px-4 py-2">
+              {% if r.leaving_timestamp %}
+                <button class="bg-green-500 text-white px-4 py-1 rounded-full cursor-not-allowed" disabled>Done</button>
+              {% else %}
+                <form method="POST" action="{{ url_for('release_spot', reservation_id=r.id, user_id=user.id) }}">
+                  <button class="bg-yellow-400 text-gray-800 px-4 py-1 rounded-full hover:bg-yellow-500 transition">Release</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center py-6 text-gray-500 font-semibold">No bookings yet</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="flex flex-wrap justify-center gap-4" data-aos="fade-up">
+    <a href="{{ url_for('user_public_lots', user_id=user.id) }}" 
+       class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-xl transition btn-hover">Check Public Availability</a>
+    <a href="{{ url_for('user_private_lots', user_id=user.id) }}" 
+       class="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-xl transition btn-hover">Check Private Availability</a>
+    <a href="{{ url_for('book_spot', user_id=user.id) }}" 
+       class="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-xl transition btn-hover">Book a Spot</a>
+       <a href="{{ url_for('book_ticket', user_id=user.id) }}" 
+       class="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-xl transition btn-hover">Book a Ticket</a>
+  </div>
+
+</div>
+
+<script>
+  AOS.init({ duration: 800, easing: 'ease-in-out', once: true });
+</script>
+{% endblock %}
