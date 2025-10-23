@@ -1,4 +1,4 @@
-# Vehicle-Parking
+# DevDhamPath
 This is a vehicle parking application going to start from today.
 
 Vehicle Parking Management System with following functionalities:-
