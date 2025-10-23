@@ -4,8 +4,6 @@
 **DevDhamPath** is an **IoT and AI-based integrated system** designed to manage crowds, parking, and pilgrim experiences at large temples and pilgrimage sites efficiently and safely.  
 The system enables **intelligent time-slot allocation, QR-based entry/exit, Aadhaar verification**, **Aarti booking with online payment**, and **real-time monitoring** using IoT sensors, camera feeds, and aerial drones.
 
-Developed for **Smart India Hackathon 2025** under the theme *Heritage & Culture*, this project aims to prevent overcrowding, enhance safety, and deliver a seamless pilgrim journey — from booking to darshan to exit.
-
 ---
 
 ## ⚙️ Key Features
