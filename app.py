@@ -10,7 +10,11 @@ def setup_app():
     app.debug=True
     print("DevDhamPath App Started")
     app.secret_key = os.urandom(24)  
-setup_app()
+app=setup_app()##why  do we do this? .... to avoid circular import
+if not os.path.exists("instance/DevDhamPath.sqlite3"):
+    db.create_all()
+    print("Database Created")
+    from create_initial_data import *
 from controllers.controller import *
 if __name__=="__main__":
     app.run(debug=True)
