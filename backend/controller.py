@@ -28,7 +28,8 @@ class LoginResource(Resource):
         return {
             "message": "Login successful",
             "user_id": user.id,
-            "role": role
+            "role": role,
+            "name": user.name
         }, 200
 api.add_resource(LoginResource, '/login')
 
@@ -88,3 +89,33 @@ class UserDashboardResource(Resource):
 
 
 api.add_resource(UserDashboardResource, '/user/dashboard/<int:user_id>')
+
+
+class UserProfileResource(Resource):
+    def get(self, user_id):
+        user = User.query.get(user_id)
+        if not user:
+            return {"message": "User not found"}, 404
+        return {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "pincode": user.pincode,
+            "address": user.address
+        }, 200
+
+    def put(self, user_id):
+        data = request.get_json()
+        user = User.query.get(user_id)
+        if not user:
+            return {"message": "User not found"}, 404
+
+        user.name = data.get('name', user.name)
+        user.email = data.get('email', user.email)
+        user.pincode = data.get('pincode', user.pincode)
+        user.address = data.get('address', user.address)
+
+        db.session.commit()
+        return {"message": "Profile updated successfully"}, 200
+
+api.add_resource(UserProfileResource, '/user/<int:user_id>')

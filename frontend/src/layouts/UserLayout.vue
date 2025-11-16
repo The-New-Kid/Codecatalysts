@@ -33,17 +33,20 @@
             <span>View Calendar</span>
           </a>
 
-          <a href="#" class="sidebar-link flex items-center gap-3 px-6 py-3 hover:pl-8">
+          <RouterLink to="/book-darshan" class="sidebar-link flex items-center gap-3 px-6 py-3 hover:pl-8">
             <i data-feather="calendar"></i> <span>Book Darshan</span>
-          </a>
+          </RouterLink>
 
           <a href="#" class="sidebar-link flex items-center gap-3 px-6 py-3 hover:pl-8">
             <i data-feather="file-text"></i> <span>Summary</span>
           </a>
-
-          <a href="#" class="sidebar-link flex items-center gap-3 px-6 py-3 hover:pl-8">
+          
+          <RouterLink
+            to="/user/edit-profile"
+            class="sidebar-link flex items-center gap-3 px-6 py-3 hover:pl-8">
             <i data-feather="user"></i> <span>Edit Profile</span>
-          </a>
+          </RouterLink>
+
 
         <button
           @click="handleLogout"

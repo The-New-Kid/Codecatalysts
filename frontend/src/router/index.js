@@ -5,6 +5,7 @@ import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import UserDashboard from '../views/UserDashboard.vue'
+import UserEdit from '../views/UserEdit.vue'
 
 const routes = [
   {
@@ -21,14 +22,17 @@ const routes = [
     path: '/register',
     name: 'register',
     component: RegisterView
-  }
-  ,
+  },
   {
     path: '/user/dashboard',
     name: 'user-dashboard',
     component: UserDashboard
   },
-
+  {
+    path : '/user/edit-profile',
+    name : 'user-edit',
+    component : UserEdit
+  },
 {
   path: '/user/public/:id',
   component: { template: '<div class="p-10 text-center">Public lots page (coming soon)</div>' }
