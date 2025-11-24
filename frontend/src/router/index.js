@@ -6,7 +6,7 @@ import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import UserDashboard from '../views/UserDashboard.vue'
 import UserEdit from '../views/UserEdit.vue'
-
+import BookDarshan from '../views/Book_Darshan.vue'
 const routes = [
   {
     path: '/',
@@ -32,6 +32,11 @@ const routes = [
     path : '/user/edit-profile',
     name : 'user-edit',
     component : UserEdit
+  },
+  {
+    path : '/book-darshan',
+    name : 'book-darshan',
+    component : BookDarshan
   },
 {
   path: '/user/public/:id',

@@ -8,11 +8,17 @@ import router from './router'
 
 const app = createApp(App)
 
-app.use(createPinia())
+// FIX: Create Pinia instance separately so DevTools detects it
+const pinia = createPinia()
+
+app.use(pinia)
 app.use(router)
 
 app.mount('#app')
+
+// Refresh animations after navigation
 router.afterEach(() => {
   if (window.AOS) {
     window.AOS.refreshHard()
-  }})
+  }
+})
