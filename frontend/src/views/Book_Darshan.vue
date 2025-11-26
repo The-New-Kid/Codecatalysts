@@ -24,6 +24,18 @@
             <input v-model="booker.mobile" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-400" />
           </div>
 
+          <!-- Darshan Date -->
+          <div>
+            <label class="block font-semibold mb-1">Select Darshan Date</label>
+            <input
+              type="date"
+              v-model="selectedDate"
+              :min="minDate"
+              :max="maxDate"
+              class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-400"
+            />
+          </div>
+
           <div>
             <label class="block font-semibold mb-1">Number of Tickets</label>
             <input
@@ -112,6 +124,14 @@ const numMembers = ref(1)
 const passengers = ref([])
 const slots = ref([])
 const selectedSlot = ref("")
+const selectedDate = ref("")
+
+// Date limits (today to next 14 days)
+const today = new Date()
+const minDate = today.toISOString().split('T')[0]
+const maxLimit = new Date()
+maxLimit.setDate(today.getDate() + 7)
+const maxDate = maxLimit.toISOString().split('T')[0]
 
 function generatePassengers() {
   passengers.value = []
@@ -160,11 +180,14 @@ async function verifyOtp(index) {
 }
 
 async function bookTickets() {
+  if (!selectedDate.value) return alert("Please select Darshan date")
+  if (!selectedSlot.value) return alert("Please select a slot")
   if (passengers.value.some(p => !p.verified)) return alert("Verify all OTPs first")
 
   const res = await axios.post(`${BASE}/book-ticket`, {
     user_id: userStore.id,
     slot_id: selectedSlot.value,
+    darshan_date: selectedDate.value,
     mobile_number: booker.value.mobile,
     passengers: passengers.value
   })

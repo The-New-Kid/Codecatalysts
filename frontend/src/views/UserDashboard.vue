@@ -113,7 +113,7 @@
         </RouterLink>
 
         <RouterLink
-          to="#"
+          to="/book-darshan"
           class="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-xl transition"
         >
           Book a Ticket

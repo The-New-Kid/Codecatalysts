@@ -59,6 +59,9 @@
           <RouterLink to="/register" class="text-orange-600 font-semibold hover:text-orange-800 transition">
             Register Here
           </RouterLink>
+          <RouterLink to="/mobile-login" class="text-orange-600 font-semibold hover:text-orange-800 transition">
+            | Login with Mobile
+          </RouterLink>
         </p>
       </div>
     </div>

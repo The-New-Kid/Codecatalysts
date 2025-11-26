@@ -35,6 +35,13 @@
           required
           class="w-full px-5 py-3 rounded-xl border border-gray-300 shadow-inner focus:ring-2 focus:ring-orange-300 transition"
         />
+        <input
+          v-model="form.mobile_no"
+          type="tel"
+          placeholder="Mobile Number"
+          required
+          class="w-full px-5 py-3 rounded-xl border border-gray-300 shadow-inner focus:ring-2 focus:ring-orange-300 transition"
+        />
 
         <div class="relative">
           <input
@@ -109,6 +116,7 @@ const form = ref({
   password: "",
   pincode: "",
   address: "",
+  mobile_no: "",
 });
 
 const showPassword = ref(false);

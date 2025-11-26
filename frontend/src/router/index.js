@@ -7,6 +7,8 @@ import RegisterView from '../views/RegisterView.vue'
 import UserDashboard from '../views/UserDashboard.vue'
 import UserEdit from '../views/UserEdit.vue'
 import BookDarshan from '../views/Book_Darshan.vue'
+import Calander from '../views/calander.vue'
+import MobileLogin from '../views/mobile-login.vue'
 const routes = [
   {
     path: '/',
@@ -37,6 +39,16 @@ const routes = [
     path : '/book-darshan',
     name : 'book-darshan',
     component : BookDarshan
+  },
+  {
+    path : '/calander',
+    name : 'calander',
+    component : Calander
+  },
+  {
+    path : '/mobile-login',
+    name : 'mobile-login',
+    component : MobileLogin
   },
 {
   path: '/user/public/:id',

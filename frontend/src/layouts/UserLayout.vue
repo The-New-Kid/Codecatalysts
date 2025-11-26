@@ -28,10 +28,10 @@
             <i data-feather="home"></i> <span>Dashboard</span>
           </RouterLink>
 
-          <a href="#" class="flex items-center px-5 py-3 hover:bg-white/20 rounded-lg">
+          <RouterLink to="/calander" class="flex items-center px-5 py-3 hover:bg-white/20 rounded-lg">
             <i data-feather="calendar" class="mr-3"></i>
             <span>View Calendar</span>
-          </a>
+          </RouterLink>
 
           <RouterLink to="/book-darshan" class="sidebar-link flex items-center gap-3 px-6 py-3 hover:pl-8">
             <i data-feather="calendar"></i> <span>Book Darshan</span>
