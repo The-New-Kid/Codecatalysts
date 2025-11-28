@@ -35,81 +35,38 @@
       .glow-text { text-shadow: 0 0 8px rgba(255, 145, 0, 0.8); }
       body { background: linear-gradient(to bottom right, #fff8e1, #fff3cd); }
 
-      /* ⭐ GOOGLE TRANSLATE DROPDOWN GLASS UI */
+      /* ⭐ Added styling to keep Google Translate widget top-left */
       #google-translate-wrapper {
         position: fixed;
-        top: 10px;
-        left: 10px;
+        top: 8px;
+        left: 8px;
         z-index: 9999;
-        background: rgba(255, 255, 255, 0.25);
-        backdrop-filter: blur(10px);
-        padding: 6px 10px;
-        border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.4);
-        box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+        background: rgba(255,255,255,0.8);
+        padding: 4px 6px;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
       }
 
-      /* Dropdown styling */
-      #google-translate-wrapper select {
-        background: rgba(255, 255, 255, 0.25) !important;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255,255,255,0.4) !important;
-        color: #3b1f01 !important;
-        font-weight: 600 !important;
-        padding: 6px 12px !important;
-        border-radius: 10px !important;
-        font-size: 15px !important;
-        cursor: pointer !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        transition: 0.25s ease-in-out;
+      /* Remove weird spacing Google injects */
+      .goog-te-banner-frame.skiptranslate {
+        display: none !important;
       }
-
-      #google-translate-wrapper select:hover {
-        background: rgba(255, 245, 200, 0.55) !important;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+      body {
+        top: 0px !important;
       }
-
-      /* Remove yellow focus */
-      .goog-te-gadget select:focus {
-        outline: none !important;
-        box-shadow: 0 0 0 2px rgba(255,170,46,0.5) !important;
-      }
-
-      /* Tiny 'powered by Google' (legal) */
-      .goog-logo-link {
-        transform: scale(0.1);
-        transform-origin: left top;
-        opacity: 0.1;
-      }
-
-      /* Remove Google extra text */
-      .goog-te-gadget span {
-        display: none;
-      }
-
-      .goog-te-gadget {
-        font-size: 0;
-      }
-
-      /* Remove Google banner */
-      .goog-te-banner-frame.skiptranslate { display: none !important; }
-      body { top: 0px !important; }
-
     </style>
   </head>
 
   <body class="text-gray-900 bg-gradient-to-br from-orange-50 via-yellow-50 to-orange-100">
-    
+
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
 
-    <!-- ⭐ GOOGLE TRANSLATE WRAPPER -->
+    <!-- ⭐ Wrapped Google Translate Inside Fixed Top-Left Container -->
     <div id="google-translate-wrapper">
       <div id="google_translate_element"></div>
     </div>
 
-    <!-- Google Translate Script -->
     <script type="text/javascript">
       function googleTranslateElementInit() {
         new google.translate.TranslateElement(
@@ -119,13 +76,10 @@
       }
     </script>
 
-    <script type="text/javascript" 
-      src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit">
-    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
     <script>
       AOS.init({ duration: 800, easing: 'ease-in-out', once: true });
     </script>
-
   </body>
 </html>

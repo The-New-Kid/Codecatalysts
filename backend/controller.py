@@ -8,6 +8,13 @@ import requests
 import calendar
 import base64 as Base64
 import time
+import random
+from datetime import datetime
+from werkzeug.utils import secure_filename
+import qrcode
+from twilio.rest import Client
+from dotenv import load_dotenv
+load_dotenv()
 api=Api(prefix='/api')
 otp_login_storage = {}
 
@@ -34,14 +41,14 @@ class MobileLoginResource(Resource):
         }
 
         try:
-            TWILIO_CLIENT.messages.create(
+            msg=TWILIO_CLIENT.messages.create(
                 from_=TWILIO_WHATSAPP_NUMBER,
                 body=f"Your OTP for DevDhamPath Login is {otp}",
                 to=f"whatsapp:+91{mobile_number}"
             )
         except Exception:
             return {"message": "OTP service failed"}, 500
-
+        
         return {"message": "OTP sent successfully"}, 200
 
 
@@ -50,10 +57,8 @@ class LoginverifyotpResource(Resource):
         data = request.get_json()
         otp = data.get('otp')
         mobile_number = data.get('mobile_number')
-
         if not otp or not mobile_number:
             return {"message": "Mobile number and OTP required"}, 400
-
         stored = otp_login_storage.get(mobile_number)
         if not stored:
             return {"message": "OTP not generated"}, 400
@@ -118,6 +123,7 @@ class RegisterResource(Resource):
         password = data.get('password')
         pincode = data.get('pincode')
         address = data.get('address')
+        mobile_no=data.get('mobile_no')
 
         if not all([name, email, password, pincode, address]):
             return {"message": "All fields are required"}, 400
@@ -128,7 +134,7 @@ class RegisterResource(Resource):
 
         # Create user
         new_user = User(name=name, email=email, password=password,
-                        pincode=pincode, address=address)
+                        pincode=pincode, address=address,mobile_no=mobile_no)
         db.session.add(new_user)
         db.session.commit()
 
@@ -206,232 +212,8 @@ class ImageserverResource(Resource):
         response.headers['Content-Type'] = mimetypes.guess_type(filename)[0] or 'image/png'
         return response
 api.add_resource(ImageserverResource,'/qrcode/<string:filename>')
-# -------------------------------------------
-#  IMPORTS FOR NEW FEATURES (SAFE TO ADD)
-# -------------------------------------------
-# import random
-# from datetime import datetime
-# from werkzeug.utils import secure_filename
-# import qrcode
-# from twilio.rest import Client
-# from dotenv import load_dotenv
-
-# load_dotenv()
-
-# # -------------------------------------------
-# #  TWILIO + OTP STORAGE
-# # -------------------------------------------
-# TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-# TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-# TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER")
-# CONTENT_SID = os.getenv("CONTENT_SID")
-
-# TWILIO_CLIENT = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-
-# AADHAR_MOBILE_MAP = {
-#     "111122223333": "+917042213383",
-#     "222233334444": "+916396081309",
-#     "333344445555": "+919900112233",
-#     "444455556666": "+919988776655",
-#     "555566667777": "+919911223344",
-#     "666677778888": "+919922334455",
-# }
-
-# otp_storage = {}
 
 
-# # -------------------------------------------
-# #  SEND OTP (WHATSAPP)
-# # -------------------------------------------
-# class SendOtpResource(Resource):
-#     def post(self):
-#         data = request.get_json()
-#         aadhar = data.get("aadhar")
-
-#         if not aadhar:
-#             return {"success": False, "message": "Aadhar missing"}, 400
-
-#         mobile = AADHAR_MOBILE_MAP.get(aadhar)
-#         if not mobile:
-#             return {"success": False, "message": "Aadhar not registered"}, 404
-
-#         otp = str(random.randint(100000, 999999))
-#         otp_storage[aadhar] = otp
-
-#         try:
-#             TWILIO_CLIENT.messages.create(
-#                 from_=TWILIO_WHATSAPP_NUMBER,
-#                 body=f"Your OTP for DevDhamPath Booking is {otp}",
-#                 to=f"whatsapp:{mobile}"
-#             )
-#             return {"success": True, "message": f"OTP sent to {mobile}"}, 200
-
-#         except Exception as e:
-#             return {"success": False, "message": str(e)}, 500
-
-
-# api.add_resource(SendOtpResource, '/send-otp')
-
-
-# # -------------------------------------------
-# #  VERIFY OTP
-# # -------------------------------------------
-# class VerifyOtpResource(Resource):
-#     def post(self):
-#         data = request.get_json()
-#         aadhar = data.get("aadhar")
-#         otp = data.get("otp")
-
-#         stored = otp_storage.get(aadhar)
-#         if stored and stored == otp:
-#             return {"success": True, "message": "OTP Verified"}, 200
-
-#         return {"success": False, "message": "Invalid OTP"}, 400
-
-
-# api.add_resource(VerifyOtpResource, '/verify-otp')
-
-
-# # -------------------------------------------
-# #  GET BOOK TICKET PAGE DATA
-# # -------------------------------------------
-# class BookTicketDataResource(Resource):
-#     def get(self, user_id):
-#         user = User.query.get(user_id)
-#         if not user:
-#             return {"message": "User not found"}, 404
-
-#         slots = DarshanSlot.query.order_by(DarshanSlot.start_time).all()
-#         lots = ParkingLot.query.all()
-#         mandirs = Mandir.query.all()
-
-#         return {
-#             "user": {"id": user.id, "name": user.name},
-#             "slots": [
-#                 {
-#                     "id": s.id,
-#                     "slot_type": s.slot_type,
-#                     "start": s.start_time.strftime("%H:%M"),
-#                     "end": s.end_time.strftime("%H:%M"),
-#                     "max_visitors": s.max_visitors
-#                 } for s in slots
-#             ],
-#             "parking_lots": [
-#                 {"id": p.id, "name": p.prime_location_name} for p in lots
-#             ],
-#             "mandirs": [
-#                 {"id": m.id, "name": m.name} for m in mandirs
-#             ]
-#         }, 200
-
-
-# api.add_resource(BookTicketDataResource, '/book-ticket/<int:user_id>')
-
-
-# # -------------------------------------------
-# #  BOOK TICKET (POST)
-# # -------------------------------------------
-# class BookTicketResource(Resource):
-#     def post(self):
-#         data = request.get_json()
-#         print("Booking Data:", data)
-#         user_id = data.get("user_id")
-#         slot_id = data.get("slot_id")
-#         passengers = data.get("passengers")
-#         mobile_number = data.get("mobile_number")
-
-#         user = User.query.get(user_id)
-#         slot = DarshanSlot.query.get(slot_id)
-
-#         if not user or not slot:
-#             return {"success": False, "message": "Invalid user or slot"}, 400
-
-#         num_members = len(passengers)
-
-#         # Capacity Check
-#         booked = Ticket.query.filter_by(slot_id=slot_id).count()
-#         if booked + num_members > slot.max_visitors:
-#             return {
-#                 "success": False,
-#                 "message": f"Only {slot.max_visitors - booked} slots left"
-#             }, 400
-
-#         # QR folder
-#         QR_FOLDER = os.path.join("static", "qrcode")
-#         os.makedirs(QR_FOLDER, exist_ok=True)
-
-#         booked_tickets = []
-
-#         for p in passengers:
-#             name = p["name"]
-#             aadhar = p["aadhar"]
-#             otp_entered = p["otp"]
-
-#             # OTP Check
-#             if otp_storage.get(aadhar) != otp_entered:
-#                 return {"success": False, "message": f"OTP failed for {name}"}, 400
-
-#             otp_storage.pop(aadhar, None)
-
-#             # Create Ticket
-#             ticket = Ticket(user_id=user_id, slot_id=slot_id)
-#             db.session.add(ticket)
-#             db.session.commit()
-
-#             # Generate QR Code
-#             qr_data = str(ticket.id)
-#             qr_img = qrcode.make(qr_data)
-#             qr_filename = f"ticket_{ticket.id}_{secure_filename(name)}.png"
-#             qr_path = os.path.join(QR_FOLDER, qr_filename)
-#             img_rgb = qr_img.convert('RGB')
-#             img_rgb.save(qr_path, 'PNG')
-
-#             ticket.qr_code = qr_filename
-#             db.session.commit()
-
-
-#             # WhatsApp Ticket
-#             try:
-#                 TWILIO_CLIENT.messages.create(
-#                     from_=TWILIO_WHATSAPP_NUMBER,
-#                     body=f"Ticket #{ticket.id} booked for {name} at {slot.start_time.strftime('%Y-%m-%d %H:%M')}",
-#                     to=f"whatsapp:{"+91"+mobile_number}"
-#                 )
-
-#                 TWILIO_CLIENT.messages.create(
-#                 from_=TWILIO_WHATSAPP_NUMBER,
-#                 body=f"Ticket #{ticket.id} booked for {name} at {slot.start_time.strftime('%Y-%m-%d %H:%M')}",
-#                 media_url=[f"https://mortgage-interval-enhanced-passenger.trycloudflare.com/api/qrcode/{qr_filename}"],
-#                 to=f"whatsapp:+91{mobile_number}"
-#                 )
-
-#             except Exception as e:
-#                 print("WhatsApp Error:", e)
-
-#             booked_tickets.append({
-#                 "ticket_id": ticket.id,
-#                 "qr_code": ticket.qr_code
-#             })
-
-#         return {"success": True, "tickets": booked_tickets}, 200
-
-
-# api.add_resource(BookTicketResource, '/book-ticket')
-
-# FULLY CORRECTED BACKEND (DARSHAN ONLY)
-# Keeps original OTP, AADHAR_MOBILE_MAP, Twilio behaviour
-# Removes Mandir usage
-# Implements Booking + Passenger + darshan_date
-
-import os
-import random
-from datetime import datetime
-from werkzeug.utils import secure_filename
-import qrcode
-from twilio.rest import Client
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # -------------------------------------------
 #  TWILIO + OTP STORAGE (UNCHANGED)

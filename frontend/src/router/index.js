@@ -9,6 +9,11 @@ import UserEdit from '../views/UserEdit.vue'
 import BookDarshan from '../views/Book_Darshan.vue'
 import Calander from '../views/calander.vue'
 import MobileLogin from '../views/mobile-login.vue'
+
+import UserEditnew from '../views/UserEditnew.vue'
+import book_darshannew from '../views/book_darshannew.vue'
+import UserDashboardnew from '../views/UserDashboardnew.vue'
+import newcalender from '../views/newcalender.vue'
 const routes = [
   {
     path: '/',
@@ -28,7 +33,22 @@ const routes = [
   {
     path: '/user/dashboard',
     name: 'user-dashboard',
-    component: UserDashboard
+    component: UserDashboardnew
+  },
+  {path : '/newcalender',
+    name : 'newcalender',
+    component : newcalender
+  },
+
+  {
+    path : '/book_darshannew',
+    name : 'book_darshannew',
+    component : book_darshannew
+  },
+  {
+    path : '/user/editnew',
+    name : 'user-editnew',
+    component : UserEditnew
   },
   {
     path : '/user/edit-profile',
