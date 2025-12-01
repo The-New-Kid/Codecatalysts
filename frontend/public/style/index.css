@@ -1,0 +1,105 @@
+/* === General Body === */
+body, html {
+  height: 100%;
+  margin: 0;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  background: url("https://cdn.dollsofindia.com/images/p/photography/somnath-temple-RO58_l.jpg") no-repeat center center fixed;
+  background-size: cover;
+}
+/* === Home Container === */
+.home-container 
+{   
+    height: 100vh; 
+    display: flex; 
+    justify-content: center;
+    align-items: center; 
+}
+/* === Home Box === */
+.home-box {
+  background: #ffffff;
+  padding: 60px 40px;
+  border-radius: 24px; /* more rounded */
+  box-shadow: 0 20px 50px rgba(0,0,0,0.18);
+  text-align: center;
+  width: 450px;
+  transition: transform 0.4s, box-shadow 0.4s;
+}
+
+.home-box:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 30px 70px rgba(0,0,0,0.25);
+}
+
+/* === Title & Subtext === */
+.home-title {
+  font-size: 2.7rem;
+  font-weight: 800;
+  color: #0d0d0d;
+  margin-bottom: 15px;
+  letter-spacing: 0.5px;
+}
+
+.home-subtext {
+  font-size: 1.25rem;
+  color: #333;
+  margin-bottom: 35px;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+/* === Buttons === */
+.home-box .btn {
+  padding: 14px 36px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border-radius: 50px;
+  transition: all 0.35s ease;
+}
+
+.home-box .btn-primary {
+  background: linear-gradient(90deg, #ff6a00 0%, #ee0979 100%);
+  border: none;
+  color: #fff;
+  box-shadow: 0 10px 25px rgba(238,9,121,0.2);
+}
+
+.home-box .btn-primary:hover {
+  background: linear-gradient(90deg, #ee0979 0%, #ff6a00 100%);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(238,9,121,0.35);
+}
+
+.home-box .btn-outline-primary {
+  color: #ee0979;
+  border: 2px solid #ee0979;
+  background: transparent;
+  box-shadow: 0 6px 15px rgba(238,9,121,0.1);
+}
+
+.home-box .btn-outline-primary:hover {
+  background: linear-gradient(90deg, #ff6a00 0%, #ee0979 100%);
+  color: #fff;
+  border-color: #ee0979;
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 30px rgba(238,9,121,0.25);
+}
+
+/* === Responsive === */
+@media(max-width:480px) {
+  .home-box {
+    width: 90%;
+    padding: 50px 25px;
+  }
+  .home-title {
+    font-size: 2.2rem;
+  }
+  .home-subtext {
+    font-size: 1.05rem;
+  }
+  .home-box .btn {
+    padding: 12px 28px;
+    font-size: 1rem;
+  }
+}
+
+
