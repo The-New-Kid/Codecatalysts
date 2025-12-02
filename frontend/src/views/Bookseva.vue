@@ -51,7 +51,7 @@
           <div>
             <label class="block font-semibold mb-1 text-gray-700">Mobile Number</label>
             <input 
-              v-model="booker.mobile" 
+              v-model="booker.mobile_no" 
               class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300 shadow-sm" 
             />
           </div>
@@ -130,7 +130,7 @@ onMounted(() => {
 const BASE = "http://127.0.0.1:5000/api"
 const userStore = useUserStore()
 
-const booker = ref({ name: userStore.name, email: "", mobile: "" })
+const booker = ref({ name: "", email: "", mobile_no: "" })
 const numPeople = ref(1)
 const sevas = ref([])
 const selectedSeva = ref("")
@@ -145,19 +145,18 @@ const maxDate = maxLimit.toISOString().split("T")[0]
 
 async function loadPage() {
   const res = await axios.get(`${BASE}/book-seva/${userStore.id}`)
-  sevas.value = res.data.sevas
+  booker.value = res.data
 }
 
 async function bookSeva() {
   if (!selectedDate.value) return alert("Please select Seva date")
   if (!selectedSeva.value) return alert("Please select a Seva")
 
-  const res = await axios.post(`${BASE}/book-seva`, {
+  const res = await axios.post(`${BASE}/book-seva/${userStore.id}`, {
     user_id: userStore.id,
-    seva_id: selectedSeva.value,
+    seva_name: selectedSeva.value,
     seva_date: selectedDate.value,
     num_people: numPeople.value,
-    booker: booker.value,
   })
 
   alert(res.data.success ? "Seva Booked Successfully!" : res.data.message)

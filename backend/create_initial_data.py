@@ -1,5 +1,6 @@
-from models.model import db, User,ParkingLot,ParkingSpot,Aarti_and_DarshanSlot,PanchangCache
+from models.model import db, User,ParkingLot,ParkingSpot,Aarti_and_DarshanSlot,PanchangCache,ParkingTimeSlot
 import datetime
+from datetime import timedelta
 # Create initial users
 user1 = User(name="Priyanshu Singh", email="priyanshu@email.com", role=0, password="priyanshu123", pincode="226010", address="Khargapur Gomti nagar Lucknow", mobile_no="1234567890")
 user2 = User(name="Shivang Agarwal", email="shivang@email.com", role=1, password="shivang123", pincode="223010", address="Noida-201034", mobile_no="7042213383")
@@ -103,3 +104,28 @@ db.session.add_all([
     p31,p32,p33,p34,p35,p36,p37,p38
 ])
 db.session.commit()
+
+
+
+start = datetime.datetime.strptime("06:00", "%H:%M")
+
+slots = []
+for i in range(10):   # 12 slots * 2 hours = 24 hours
+    slot_start = start + timedelta(hours=2*i)
+    slot_end = slot_start + timedelta(hours=2)
+
+    # Handle next-day rollover
+    if slot_end.day != slot_start.day:
+        slot_end = datetime.datetime.combine(slot_start.date(), datetime.datetime.min.time()) + timedelta(days=1)
+
+    slots.append(
+        ParkingTimeSlot(
+            start_time=slot_start,
+            end_time=slot_end
+        )
+    )
+
+db.session.add_all(slots)
+db.session.commit()
+
+print("Dummy 2-hour time slots inserted successfully!")

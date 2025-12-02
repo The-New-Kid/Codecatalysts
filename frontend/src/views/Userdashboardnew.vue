@@ -23,7 +23,7 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-5xl">
-            <RouterLink to="#" class="glass-btn group bg-orange-600 border-none hover:bg-orange-700">
+            <RouterLink to="/book-spot" class="glass-btn group bg-orange-600 border-none hover:bg-orange-700">
                 <div class="icon-circle bg-white text-orange-600">
                     <i data-feather="check-circle" class="w-6 h-6"></i>
                 </div>
@@ -190,7 +190,7 @@
                     <p class="text-gray-600 mb-4 text-sm">
                         Find comfortable and affordable *Dharamshala* (guesthouse) options near the temple for your stay.
                     </p>
-                    <RouterLink to="#" class="text-purple-600 hover:text-purple-800 font-medium text-sm flex items-center">
+                    <RouterLink to="/accomodation" class="text-purple-600 hover:text-purple-800 font-medium text-sm flex items-center">
                         View Stays <i data-feather="arrow-right" class="w-4 h-4 ml-1"></i>
                     </RouterLink>
                 </div>

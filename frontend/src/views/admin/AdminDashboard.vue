@@ -83,7 +83,7 @@
       <div class="flex justify-center mb-16 px-4">
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl"> 
               
-              <RouterLink to="/admin/calendar" class="admin-link-btn secondary-btn group bg-indigo-600 hover:bg-indigo-700">
+              <RouterLink to="/admin/calender" class="admin-link-btn secondary-btn group bg-indigo-600 hover:bg-indigo-700">
                   <div class="icon-circle-xs bg-white text-indigo-600">
                       <i data-feather="calendar" class="w-4 h-4"></i>
                   </div>

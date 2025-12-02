@@ -115,12 +115,12 @@
         </div>
       </transition>
     </header>
-
-    <main class="flex-1 pt-20 pb-4">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <RouterView />
-      </div>
-    </main>
+      <main class="flex-1 pt-20 pb-4">
+        <!-- FULL WIDTH CONTENT (banners, maps, analytics, charts) -->
+        <div class="w-full">
+          <RouterView />
+        </div>
+      </main>
 
     <footer class="bg-red-900 text-orange-100 py-6 text-center border-t-4 border-yellow-500">
       <p class="font-serif italic">“Satyam Shivam Sundaram”</p>

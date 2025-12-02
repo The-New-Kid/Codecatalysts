@@ -25,8 +25,9 @@ class ParkingLot(db.Model):
     max_spots = db.Column(db.Integer, nullable=False)
     spots = db.relationship('ParkingSpot', backref='lot', cascade="all, delete")
     revenue = db.Column(db.Float, default=0.0)
-    is_private = db.Column(db.Boolean, default=False) 
-    
+    is_private = db.Column(db.Boolean, default=False)
+    time_slot_id=db.Column(db.Integer,db.ForeignKey('parking_time_slots.id'))
+
 class ParkingSpot(db.Model):
     __tablename__ = 'parking_spots'
     id = db.Column(db.Integer, primary_key=True)
@@ -37,7 +38,6 @@ class ParkingSpot(db.Model):
 class ParkingTimeSlot(db.Model):
     __tablename__ = 'parking_time_slots'
     id = db.Column(db.Integer, primary_key=True)
-    spot_id = db.Column(db.Integer, db.ForeignKey('parking_spots.id',ondelete='CASCADE'), nullable=False)
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=False)
 

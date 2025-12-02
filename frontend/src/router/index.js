@@ -136,6 +136,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '../stores/user'
 
 // Views
+import AccomodationFinder from '../views/AccomodationFinder.vue'
+import Bookspot from '../views/book-spot.vue'
 import Bookseva from '../views/Bookseva.vue'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
@@ -171,6 +173,11 @@ const routes = [
     { path: '/mobile-login', name: 'mobile-login', component: MobileLogin },
 
     // USER PROTECTED ROUTES -----------------------------
+  {
+    path: '/accomodation',
+    name: 'AccomodationFinder',
+    component: AccomodationFinder
+  },
     {
         path: '/user/dashboard',
         name: 'user-dashboard',
@@ -208,12 +215,6 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
-        path: '/calander',
-        name: 'calander',
-        component: Calander,
-        meta: { requiresAuth: true }
-    },
-    {
         path: '/book-aarti',
         name: 'book-aarti',
         component: BookAarti,
@@ -223,6 +224,12 @@ const routes = [
         path: '/book-seva',
         name: 'book-seva',
         component: Bookseva,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/book-spot',
+        name: 'book-spot',
+        component: Bookspot,
         meta: { requiresAuth: true }
     },
     // Dynamic routes still require login
@@ -243,7 +250,7 @@ const routes = [
             { path: 'parking-lots/add', name: 'admin-add-lot', component: AddParkingLot },
             { path: 'parking-lots/:id/edit', name: 'admin-edit-lot', component: AddParkingLot, props: true },
             { path: 'spots/:id', name: 'admin-spot-detail', component: AdminSpotDetail },
-            { path: 'calendar', name: 'admin-calendar', component: AdminCalendar },
+            { path: 'calender', name: 'admin-calendar', component: AdminCalendar },
             { path: 'private-parking', name: 'admin-private-parking', component: AdminPrivateParking },
             { path: 'scan-ticket', name: 'admin-scan-ticket', component: AdminScanTicket },
             { path: 'analytics', name: 'admin-summary', component: AdminSummary },

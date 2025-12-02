@@ -6,6 +6,8 @@ import mimetypes
 import os
 import requests
 import calendar
+from pyzbar.pyzbar import decode
+from PIL import Image
 import base64 as Base64
 import time
 import random
@@ -14,9 +16,87 @@ from werkzeug.utils import secure_filename
 import qrcode
 from twilio.rest import Client
 from dotenv import load_dotenv
+from flask import request
+from flask_restful import Resource
+from sqlalchemy import and_
+from datetime import timedelta
+import json
+import cv2
 load_dotenv()
 api=Api(prefix='/api')
 otp_login_storage = {}
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER")
+CONTENT_SID = os.getenv("CONTENT_SID")
+clouflare_url="asd"
+TWILIO_CLIENT = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+AADHAR_MOBILE_MAP = {
+    "111122223333": "+917042213383",
+    "222233334444": "+916396081309",
+    "333344445555": "+919900112233",
+    "444455556666": "+919988776655",
+    "555566667777": "+919911223344",
+    "666677778888": "+919922334455",
+}
+
+otp_storage = {}
+def qrgenerator(data,filename):
+            QR_FOLDER = os.path.join("static", "qrcode")
+            os.makedirs(QR_FOLDER, exist_ok=True)
+
+            qr_data_bytes=data.encode('utf-8')
+            qr_data=Base64.b64encode(qr_data_bytes)
+            qr_img = qrcode.make(qr_data)
+            qr_path = os.path.join(QR_FOLDER, filename)
+            qr_img.convert('RGB').save(qr_path, 'PNG')
+            return qr_data
+
+class SendOtpResource(Resource):
+    def post(self):
+        data = request.get_json()
+        aadhar = data.get("aadhar")
+
+        if not aadhar:
+            return {"success": False, "message": "Aadhar missing"}, 400
+
+        mobile = AADHAR_MOBILE_MAP.get(aadhar)
+        if not mobile:
+            return {"success": False, "message": "Aadhar not registered"}, 404
+
+        otp = str(random.randint(100000, 999999))
+        otp_storage[aadhar] = otp
+
+        try:
+            TWILIO_CLIENT.messages.create(
+                from_=TWILIO_WHATSAPP_NUMBER,
+                body=f"Your OTP for DevDhamPath Booking is {otp}",
+                to=f"whatsapp:{mobile}"
+            )
+            return {"success": True, "message": f"OTP sent to {mobile}"}, 200
+
+        except Exception as e:
+            return {"success": False, "message": str(e)}, 500
+
+class VerifyOtpResource(Resource):
+    def post(self):
+        data = request.get_json()
+        aadhar = data.get("aadhar")
+        otp = data.get("otp")
+
+        stored = otp_storage.get(aadhar)
+        if stored and stored == otp:
+            return {"success": True, "message": "OTP Verified"}, 200
+
+        return {"success": False, "message": "Invalid OTP"}, 400
+
+class ImageserverResource(Resource):
+    def get(self, filename):
+        base_path = os.path.abspath(os.path.join(app.root_path, '..', 'static', 'qrcode'))
+        response = make_response(send_from_directory(base_path, filename))
+        response.headers['Content-Type'] = mimetypes.guess_type(filename)[0] or 'image/png'
+        return response
 
 class MobileLoginResource(Resource):
     def post(self):
@@ -41,7 +121,7 @@ class MobileLoginResource(Resource):
         }
 
         try:
-            msg=TWILIO_CLIENT.messages.create(
+            TWILIO_CLIENT.messages.create(
                 from_=TWILIO_WHATSAPP_NUMBER,
                 body=f"Your OTP for DevDhamPath Login is {otp}",
                 to=f"whatsapp:+91{mobile_number}"
@@ -50,7 +130,6 @@ class MobileLoginResource(Resource):
             return {"message": "OTP service failed"}, 500
         
         return {"message": "OTP sent successfully"}, 200
-
 
 class LoginverifyotpResource(Resource):
     def post(self):
@@ -86,7 +165,9 @@ class LoginverifyotpResource(Resource):
         }, 200
 api.add_resource(MobileLoginResource, '/mobile-login')
 api.add_resource(LoginverifyotpResource, '/login-verify-otp')
-
+api.add_resource(ImageserverResource,'/qrcode/<string:filename>')
+api.add_resource(VerifyOtpResource, '/verify-otp')
+api.add_resource(SendOtpResource, '/send-otp')
 
 class LoginResource(Resource):
     def post(self):
@@ -214,94 +295,6 @@ class UserProfileResource(Resource):
 
 api.add_resource(UserProfileResource, '/user/<int:user_id>')
 
-
-
-class ImageserverResource(Resource):
-    def get(self, filename):
-        base_path = os.path.abspath(os.path.join(app.root_path, '..', 'static', 'qrcode'))
-        response = make_response(send_from_directory(base_path, filename))
-        response.headers['Content-Type'] = mimetypes.guess_type(filename)[0] or 'image/png'
-        return response
-api.add_resource(ImageserverResource,'/qrcode/<string:filename>')
-
-
-
-# -------------------------------------------
-#  TWILIO + OTP STORAGE (UNCHANGED)
-# -------------------------------------------
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER")
-CONTENT_SID = os.getenv("CONTENT_SID")
-
-TWILIO_CLIENT = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-
-AADHAR_MOBILE_MAP = {
-    "111122223333": "+917042213383",
-    "222233334444": "+916396081309",
-    "333344445555": "+919900112233",
-    "444455556666": "+919988776655",
-    "555566667777": "+919911223344",
-    "666677778888": "+919922334455",
-}
-
-otp_storage = {}
-
-# -------------------------------------------
-#  SEND OTP (UNCHANGED)
-# -------------------------------------------
-class SendOtpResource(Resource):
-    def post(self):
-        data = request.get_json()
-        aadhar = data.get("aadhar")
-
-        if not aadhar:
-            return {"success": False, "message": "Aadhar missing"}, 400
-
-        mobile = AADHAR_MOBILE_MAP.get(aadhar)
-        if not mobile:
-            return {"success": False, "message": "Aadhar not registered"}, 404
-
-        otp = str(random.randint(100000, 999999))
-        otp_storage[aadhar] = otp
-
-        try:
-            TWILIO_CLIENT.messages.create(
-                from_=TWILIO_WHATSAPP_NUMBER,
-                body=f"Your OTP for DevDhamPath Booking is {otp}",
-                to=f"whatsapp:{mobile}"
-            )
-            return {"success": True, "message": f"OTP sent to {mobile}"}, 200
-
-        except Exception as e:
-            return {"success": False, "message": str(e)}, 500
-
-
-api.add_resource(SendOtpResource, '/send-otp')
-
-
-# -------------------------------------------
-#  VERIFY OTP (UNCHANGED)
-# -------------------------------------------
-class VerifyOtpResource(Resource):
-    def post(self):
-        data = request.get_json()
-        aadhar = data.get("aadhar")
-        otp = data.get("otp")
-
-        stored = otp_storage.get(aadhar)
-        if stored and stored == otp:
-            return {"success": True, "message": "OTP Verified"}, 200
-
-        return {"success": False, "message": "Invalid OTP"}, 400
-
-
-api.add_resource(VerifyOtpResource, '/verify-otp')
-
-
-# -------------------------------------------
-#  GET BOOK TICKET PAGE DATA (MANDIR REMOVED)
-# -------------------------------------------
 class BookTicketDataResource(Resource):
     def get(self, user_id):
         user = User.query.get(user_id)
@@ -407,14 +400,9 @@ class BookTicketResource(Resource):
             db.session.flush()
 
             qr_data = str({"name":name,"passenger_id":passenger.id, "darshan_date":darshan_date, "slot_id":slot_id,"adhaar":aadhar,"special":is_special,"with_special":with_special})
-            qr_data_bytes=qr_data.encode('utf-8')
-            qr_data=Base64.b64encode(qr_data_bytes)
-            qr_img = qrcode.make(qr_data)
             qr_filename = f"passenger_{passenger.id}_{secure_filename(name)}.png"
-            qr_path = os.path.join(QR_FOLDER, qr_filename)
-            qr_img.convert('RGB').save(qr_path, 'PNG')
-
-            passenger.qr_code = qr_data
+            encoded=qrgenerator(qr_data,qr_filename)
+            passenger.qr_code = encoded
             print(qr_filename)
             try:
                 TWILIO_CLIENT.messages.create(
@@ -426,7 +414,7 @@ class BookTicketResource(Resource):
                 TWILIO_CLIENT.messages.create(
                     from_=TWILIO_WHATSAPP_NUMBER,
                     body=f"Ticket #{passenger.id} booked for {name} at {slot.start_time.strftime('%Y-%m-%d %H:%M')}",
-                    media_url=[f"https://uploaded-capacity-floor-burner.trycloudflare.com/api/qrcode/{qr_filename}"],         ##Cloudflareee
+                    media_url=[f"{clouflare_url}/api/qrcode/{qr_filename}"],         ##Cloudflareee
                     to=f"whatsapp:+91{mobile_number}"
                 )
             except Exception as e:
@@ -843,7 +831,10 @@ class ScanTicketImageResource(Resource):
             img = Image.open(filepath)
             decoded_objs = decode(img)
             if decoded_objs:
-                qr_data = decoded_objs[0].data.decode('utf-8')
+                qr_data = decoded_objs[0].data
+                decoded = Base64.b64decode(qr_data).decode("utf-8")
+                print(decoded)
+                print(type(decoded))
             else:
                 return {
                     "success": False,
@@ -852,14 +843,18 @@ class ScanTicketImageResource(Resource):
 
             # Interpret QR content as ticket_id
             try:
-                ticket_id = int(qr_data)
-            except ValueError:
+                data = ast.literal_eval(decoded)
+                passenger_id=data['passenger_id']
+                print(passenger_id)
+                print(type(passenger_id))
+            except :
+                print("kutta bacha")
                 return {
                     "success": False,
                     "message": "❌ Invalid QR code content."
                 }, 400
 
-            ticket = Ticket.query.get(ticket_id)
+            ticket = Passenger.query.get(passenger_id)
             if not ticket:
                 return {
                     "success": False,
@@ -869,11 +864,9 @@ class ScanTicketImageResource(Resource):
             # Same logic as your original route
             if ticket.scan_count == 0:
                 ticket.scan_count = 1
-                ticket.status = "Entered"
                 message = f"✅ Entry granted for Ticket {ticket.id}"
             elif ticket.scan_count == 1:
                 ticket.scan_count = 2
-                ticket.status = "Exited"
                 message = f"✅ Exit recorded for Ticket {ticket.id}"
             else:
                 message = f"❌ Ticket {ticket.id} already expired."
@@ -885,7 +878,6 @@ class ScanTicketImageResource(Resource):
                 "message": message,
                 "ticket": {
                     "id": ticket.id,
-                    "status": ticket.status,
                     "scan_count": ticket.scan_count,
                 },
             }, 200
@@ -898,64 +890,77 @@ class ScanTicketImageResource(Resource):
             }, 500
 
 class ScanTicketLiveResource(Resource):
+    """
+    Expect POST JSON: { "qr_text": "<base64-or-raw-string-from-QR>" }
+    The client (browser) should decode QR and send the QR payload to this endpoint.
+    """
     def post(self):
-        """
-        Handle live QR data from camera.
-        Mirrors the logic of /scan-ticket-live.
-        """
-        data = request.get_json() or {}
-        ticket_id = data.get('ticket_id')
-
-        if not ticket_id:
-            return {
-                "success": False,
-                "message": "❌ ticket_id missing.",
-                "status": "error"
-            }, 400
-
+        payload = None
         try:
-            ticket_id = int(ticket_id)
-            ticket = Ticket.query.get(ticket_id)
-            if not ticket:
-                return {
-                    "success": False,
-                    "message": "❌ Ticket not found.",
-                    "status": "error"
-                }, 404
+            data = request.get_json(force=True, silent=True) or {}
+            qr_text = data.get("qr_text")
+            if not qr_text:
+                return {"success": False, "message": "❌ No QR text provided."}, 400
 
+            # qr_text may be bytes-string or str; if it looks base64, decode it
+            decoded_str = None
+            try:
+                # If qr_text is bytes-like inside string, ensure bytes
+                if isinstance(qr_text, str):
+                    qr_bytes = qr_text.encode("utf-8")
+                else:
+                    qr_bytes = qr_text
+
+                # Try base64 decode first (most of your QRs contain base64-encoded dict)
+                try:
+                    decoded_str = Base64.b64decode(qr_bytes).decode("utf-8")
+                except Exception:
+                    # fallback: maybe it's already a plain string dict not base64
+                    decoded_str = qr_text if isinstance(qr_text, str) else qr_text.decode("utf-8")
+            except Exception as e:
+                return {"success": False, "message": f"❌ Failed to normalize QR text: {e}"}, 400
+
+            # parse the string into python dict safely
+            try:
+                parsed = ast.literal_eval(decoded_str)
+                passenger_id = parsed.get("passenger_id")
+                if passenger_id is None:
+                    raise ValueError("passenger_id missing in QR payload")
+            except Exception as e:
+                return {"success": False, "message": f"❌ Invalid QR payload: {e}"}, 400
+
+            # retrieve ticket
+            try:
+                ticket = Passenger.query.get(int(passenger_id))
+            except Exception as e:
+                return {"success": False, "message": f"❌ Invalid passenger_id: {e}"}, 400
+
+            if not ticket:
+                return {"success": False, "message": "❌ Ticket not found."}, 404
+
+            # Same logic as static scan
             if ticket.scan_count == 0:
                 ticket.scan_count = 1
-                ticket.status = "Entered"
                 message = f"✅ Entry granted for Ticket {ticket.id}"
-                status = "success"
             elif ticket.scan_count == 1:
                 ticket.scan_count = 2
-                ticket.status = "Exited"
                 message = f"✅ Exit recorded for Ticket {ticket.id}"
-                status = "success"
             else:
                 message = f"❌ Ticket {ticket.id} already expired."
-                status = "error"
 
             db.session.commit()
 
             return {
                 "success": True,
                 "message": message,
-                "status": status,
                 "ticket": {
                     "id": ticket.id,
-                    "status": ticket.status,
                     "scan_count": ticket.scan_count,
-                }
+                },
             }, 200
 
         except Exception as e:
-            return {
-                "success": False,
-                "message": f"❌ Invalid QR: {e}",
-                "status": "error"
-            }, 400
+            return {"success": False, "message": f"❌ Server error: {e}"}, 500
 
 api.add_resource(ScanTicketImageResource, '/scan-ticket/image')
 api.add_resource(ScanTicketLiveResource, '/scan-ticket/live')
@@ -1025,12 +1030,20 @@ api.add_resource(AdminUsersResource, '/admin/users')
 
 
 class BooksevaResource(Resource):
-    def post(self):
+    def get(self,user_id):
+        bookings = User.query.filter_by(id=user_id).first()
+        return {
+                "email": bookings.email,
+                "mobile_no": bookings.mobile_no,
+                "name": bookings.name,
+            }, 200
+
+    def post(self,user_id=None):
         data = request.get_json()
         user_id = data.get("user_id")
         seva_name = data.get("seva_name")
         seva_date_str = data.get("seva_date")
-        participants = data.get("participants")
+        participants = data.get("num_people")
 
         if not all([user_id, seva_name, seva_date_str, participants]):
             return {"success": False, "message": "All fields are required."}, 400
@@ -1049,18 +1062,26 @@ class BooksevaResource(Resource):
 
         db.session.add(new_seva_booking)
         db.session.commit()
-
-        return {
-            "success": True,
-            "message": "Seva booked successfully.",
-            "booking": {
+        response_data = {
                 "id": new_seva_booking.id,
                 "user_id": new_seva_booking.user_id,
                 "seva_name": new_seva_booking.seva_name,
-                "seva_date": new_seva_booking.seva_date.strftime("%Y-%m-%d"),
-                "participants": new_seva_booking.participants
-            }
-        }, 201
+                "seva_date": new_seva_booking.booking_date.strftime("%Y-%m-%d"),
+                "participants": new_seva_booking.quantity}
+        qrgenerator(str(response_data),f"seva_booking_{new_seva_booking.id}.png")
+        
+        
+        TWILIO_CLIENT.messages.create(
+                    from_=TWILIO_WHATSAPP_NUMBER,
+                    body=f"Seva '{seva_name}' booked in the name of {new_seva_booking.user.name} on {seva_date_str} for {participants} participants.",
+                    media_url=[f"{clouflare_url}/api/qrcode/seva_booking_{new_seva_booking.id}.png"],
+                    to=f"whatsapp:+91{new_seva_booking.user.mobile_no}"
+                    )
+        return {
+            "success": True,
+            "message": "Seva booked successfully."}, 201
+
+api.add_resource(BooksevaResource, '/book-seva/<int:user_id>')
 
 
 class AdminDarshanslotResource(Resource):
@@ -1151,3 +1172,141 @@ class AdminDarshanslotResource(Resource):
 
         return {"message": "Slot deleted."}, 200
 api.add_resource(AdminDarshanslotResource, '/admin/darshan-slots')
+
+
+class ParkingLotResource(Resource):
+    def get(self):
+        lot_type = request.args.get("type")  # 'public' or 'private'
+
+        query = ParkingLot.query
+        if lot_type == "public":
+            query = query.filter_by(is_private=False)
+        elif lot_type == "private":
+            query = query.filter_by(is_private=True)
+
+        lots = query.all()
+
+        return {
+            "lots": [
+                {
+                    "id": lot.id,
+                    "name": lot.prime_location_name,
+                    "address": lot.address,
+                    "pin_code": lot.pin_code,
+                    "price_per_hour": lot.price_per_hour,
+                    "max_spots": lot.max_spots,
+                    "is_private": lot.is_private
+                }
+                for lot in lots
+            ]
+        }, 200
+
+api.add_resource(ParkingLotResource, '/parking-lots')
+
+class ParkingTimeSlotsResource(Resource):
+    def get(self):
+        slots = ParkingTimeSlot.query.order_by(ParkingTimeSlot.start_time).all()
+        
+        return {
+            "slots": [
+                {
+                    "id": slot.id,
+                    "start_time": slot.start_time.strftime("%H:%M"),
+                    "end_time": slot.end_time.strftime("%H:%M"),
+                    "slot_order": i + 1,  # derived order
+                }
+                for i, slot in enumerate(slots)
+            ]
+        }, 200
+api.add_resource(ParkingTimeSlotsResource,'/parking-time-slots')
+
+class BookParking(Resource):
+    def post(self):
+        data = request.get_json()
+
+        user_id = data.get("user_id")
+        lot_id = data.get("lot_id")
+        vehicle = data.get("vehicle_number")
+        date = data.get("parking_date")
+
+        lot = ParkingLot.query.get(lot_id)
+        if not lot:
+            return {"message": "Invalid parking lot"}, 400
+
+        # PUBLIC BOOKING -----------------------------------------------------
+        if not lot.is_private:
+            slot_id = data.get("slot_id")
+
+            # Try to find an available spot
+            spots = ParkingSpot.query.filter_by(lot_id=lot_id).all()
+
+            for spot in spots:
+                exists = PublicReservation.query.filter_by(
+                    spot_id=spot.id,
+                    date_of_parking=date,
+                    timeslot_id=slot_id
+                ).first()
+
+                if not exists:
+                    # Book this spot
+                    res = PublicReservation(
+                        lot_id=lot_id,
+                        spot_id=spot.id,
+                        user_id=user_id,
+                        vehicle_number=vehicle,
+                        date_of_parking=date,
+                        timeslot_id=slot_id
+                    )
+                    db.session.add(res)
+                    db.session.commit()
+
+                    return {"message": "Public parking booked successfully!"}, 200
+            
+            return {"message": "No available spots for this time slot"}, 409
+
+        # PRIVATE BOOKING -----------------------------------------------------
+        else:
+            start_slot = data.get("start_slot")
+            end_slot = data.get("end_slot")
+
+            if not start_slot or not end_slot:
+                return {"message": "Provide start and end slot"}, 400
+
+            # Ensure ordered correctly
+            if start_slot > end_slot:
+                return {"message": "End slot must be after start slot"}, 400
+
+            # Get the slot range
+            full_range = ParkingTimeSlot.query.filter(
+                ParkingTimeSlot.id >= start_slot,
+                ParkingTimeSlot.id <= end_slot
+            ).all()
+
+            # Try to find spot where ALL slots are free
+            spots = ParkingSpot.query.filter_by(lot_id=lot_id).all()
+
+            for spot in spots:
+                conflict = PrivateReservation.query.filter(
+                    PrivateReservation.spot_id == spot.id,
+                    PrivateReservation.date_of_parking == date,
+                    PrivateReservation.timeslot_id.in_([s.id for s in full_range])
+                ).first()
+
+                if not conflict:
+                    # Reserve all slots individually
+                    for s in full_range:
+                        r = PrivateReservation(
+                            lot_id=lot_id,
+                            spot_id=spot.id,
+                            user_id=user_id,
+                            vehicle_number=vehicle,
+                            date_of_parking=date,
+                            timeslot_id=s.id
+                        )
+                        db.session.add(r)
+
+                    db.session.commit()
+                    return {"message": "Private parking booked successfully!"}, 200
+
+            return {"message": "No spot available for the requested time range"}, 409
+api.add_resource(BookParking,'/book-parking')
