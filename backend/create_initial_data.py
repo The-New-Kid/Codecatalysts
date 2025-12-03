@@ -95,15 +95,41 @@ p35 = PanchangCache(day=5, month=12, year=2025, tithi="Krishna Pratipada")
 p36 = PanchangCache(day=6, month=12, year=2025, tithi="Krishna Dwitiya")
 p37 = PanchangCache(day=7, month=12, year=2025, tithi="Krishna Tritiya")
 p38 = PanchangCache(day=8, month=12, year=2025, tithi="Krishna Chaturthi")
-
+p39 = PanchangCache(day=9, month=12, year=2025, tithi="Krishna Panchami")
+p40 = PanchangCache(day=10, month=12, year=2025, tithi="Krishna Shashthi")
+p41 = PanchangCache(day=11, month=12, year=2025, tithi="Krishna Saptami")
+p42 = PanchangCache(day=12, month=12, year=2025, tithi="Krishna Ashtami")
+p43 = PanchangCache(day=13, month=12, year=2025, tithi="Krishna Navami")
+p44 = PanchangCache(day=14, month=12, year=2025, tithi="Krishna Dashami")
+p45 = PanchangCache(day=15, month=12, year=2025, tithi="Krishna Ekadashi")
+p46 = PanchangCache(day=16, month=12, year=2025, tithi="Krishna Dwadashi")
+p47 = PanchangCache(day=17, month=12, year=2025, tithi="Krishna Trayodashi")
+p48 = PanchangCache(day=18, month=12, year=2025, tithi="Krishna Chaturdashi")
+p49 = PanchangCache(day=19, month=12, year=2025, tithi="Amavasya")
+p50 = PanchangCache(day=20, month=12, year=2025, tithi="Shukla Pratipada")
+p51 = PanchangCache(day=21, month=12, year=2025, tithi="Shukla Pratipada")
+p52 = PanchangCache(day=22, month=12, year=2025, tithi="Shukla Dwitiya")
+p53 = PanchangCache(day=23, month=12, year=2025, tithi="Shukla Tritiya")
+p54 = PanchangCache(day=24, month=12, year=2025, tithi="Shukla Chaturthi")
+p55 = PanchangCache(day=25, month=12, year=2025, tithi="Shukla Panchami")
+p56 = PanchangCache(day=26, month=12, year=2025, tithi="Shukla Shashthi")
+p57 = PanchangCache(day=27, month=12, year=2025, tithi="Shukla-Saptami")
+p58 = PanchangCache(day=28, month=12, year=2025, tithi="Shukla-Ashtami")
+p59 = PanchangCache(day=29, month=12, year=2025, tithi="Shukla-Navami")
+p60 = PanchangCache(day=30, month=12, year=2025, tithi="Shukla-Dashami")
+p61 = PanchangCache(day=31, month=12, year=2025, tithi="Shukla Dwadashi")
 
 db.session.add_all([
     p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,
     p11,p12,p13,p14,p15,p16,p17,p18,p19,p20,
     p21,p22,p23,p24,p25,p26,p27,p28,p29,p30,
-    p31,p32,p33,p34,p35,p36,p37,p38
+    p31,p32,p33,p34,p35,p36,p37,p38,p39,p40,
+    p41,p42,p43,p44,p45,p46,p47,p48,p49,p50,
+    p51,p52,p53,p54,p55,p56,p57,p58,p59,p60,
+    p61
 ])
 db.session.commit()
+
 
 
 

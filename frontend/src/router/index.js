@@ -136,6 +136,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '../stores/user'
 
 // Views
+import Book_aarti_Tatkal from '../views/Book_aarti_Tatkal.vue'
+import Book_Darshan_Tatkal from '../views/Book_Darshan_Tatkal.vue'
+import UserLayout from '../layouts/Userlayoutnew.vue'
+import UserLayoutforcalender from '../layouts/userlayoutforcalender.vue'
 import AccomodationFinder from '../views/AccomodationFinder.vue'
 import Bookspot from '../views/book-spot.vue'
 import Bookseva from '../views/Bookseva.vue'
@@ -147,16 +151,15 @@ import UserEditnew from '../views/UserEditnew.vue'
 import BookDarshanNew from '../views/book_darshannew.vue'
 import NewCalender from '../views/newcalender.vue'
 import BookDarshan from '../views/Book_Darshan.vue'
-import Calander from '../views/calander.vue'
 import MobileLogin from '../views/mobile-login.vue'
 import UserEdit from '../views/UserEdit.vue'
 import BookAarti from '../views/Book_Aarti.vue'
 
 // Admin Views
+import AdminDarshanDetails from '../views/admin/Admin_Darshan_details.vue'
 import AdminDarshanslots from '../views/admin/AdminDarshanslots.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 import AdminDashboard from '../views/admin/AdminDashboard.vue'
-import AdminCalendar from '../views/admin/AdminCalendar.vue'
 import AdminPrivateParking from '../views/admin/AdminPrivateParking.vue'
 import AdminScanTicket from '../views/admin/AdminScanTicket.vue'
 import AdminSummary from '../views/admin/AdminSummary.vue'
@@ -166,6 +169,17 @@ import AddParkingLot from '../views/admin/AddParkingLot.vue'
 import ParkingLotList from '../views/admin/ParkingLotList.vue'
 
 const routes = [
+  {
+  path: '/user',
+  component: UserLayoutforcalender,
+  meta:{requiresAuth:true},
+  children: [
+     { 
+       path: 'newcalender',
+       name: 'newcalender',
+       component: NewCalender 
+     }]
+},
     // Public routes
     { path: '/', name: 'home', component: HomeView },
     { path: '/login', name: 'login', component: LoginView },
@@ -173,7 +187,8 @@ const routes = [
     { path: '/mobile-login', name: 'mobile-login', component: MobileLogin },
 
     // USER PROTECTED ROUTES -----------------------------
-  {
+
+    {
     path: '/accomodation',
     name: 'AccomodationFinder',
     component: AccomodationFinder
@@ -182,12 +197,6 @@ const routes = [
         path: '/user/dashboard',
         name: 'user-dashboard',
         component: UserDashboardnew,
-        meta: { requiresAuth: true }
-    },
-    {
-        path: '/newcalender',
-        name: 'newcalender',
-        component: NewCalender,
         meta: { requiresAuth: true }
     },
     {
@@ -232,6 +241,16 @@ const routes = [
         component: Bookspot,
         meta: { requiresAuth: true }
     },
+    {
+        path:'/book_darshan_tatkal',
+        name:'book_darshan_tatkal',
+        component:Book_Darshan_Tatkal,
+        meta:{requiresAuth:true}
+    },{
+        path:'/book_aarti_tatkal',
+        name:'book_aarti_tatkal',
+        component:Book_aarti_Tatkal
+    },
     // Dynamic routes still require login
     { path: '/user/public/:id', meta: { requiresAuth: true }, component: { template: '<div class="p-10 text-center">Public lots page (coming soon)</div>' }},
     { path: '/user/private/:id', meta: { requiresAuth: true }, component: { template: '<div class="p-10 text-center">Private lots page (coming soon)</div>' }},
@@ -244,17 +263,18 @@ const routes = [
         component: AdminLayout,
         meta: { requiresAuth: true, admin: true },
         children: [
+            {path:'calender',name:'admincalender',component:NewCalender},
             {path: 'darshan-slots', name: 'admin-darshanslots', component: AdminDarshanslots },
             { path: 'dashboard', name: 'admin-dashboard', component: AdminDashboard },
             { path: 'parking-lots', name: 'admin-parking-lots', component: ParkingLotList },
             { path: 'parking-lots/add', name: 'admin-add-lot', component: AddParkingLot },
             { path: 'parking-lots/:id/edit', name: 'admin-edit-lot', component: AddParkingLot, props: true },
             { path: 'spots/:id', name: 'admin-spot-detail', component: AdminSpotDetail },
-            { path: 'calender', name: 'admin-calendar', component: AdminCalendar },
             { path: 'private-parking', name: 'admin-private-parking', component: AdminPrivateParking },
             { path: 'scan-ticket', name: 'admin-scan-ticket', component: AdminScanTicket },
             { path: 'analytics', name: 'admin-summary', component: AdminSummary },
             { path: 'users', name: 'admin-users', component: AdminUsers },
+            {path:'all-tickets',name:'all-tickets',component:AdminDarshanDetails}
         ]
     }
 ]

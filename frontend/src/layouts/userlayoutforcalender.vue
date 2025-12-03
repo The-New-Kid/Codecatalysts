@@ -56,10 +56,9 @@
         </div>
       </div>
     </header>
-
-    <main class="flex-1 pt-20">
-      <slot />
-    </main>
+<main class="flex-1 pt-20">
+  <router-view />
+</main>
 
     <footer class="bg-red-900 text-orange-100 py-6 text-center border-t-4 border-yellow-500">
         <p class="font-serif italic">“Satyam Shivam Sundaram”</p>

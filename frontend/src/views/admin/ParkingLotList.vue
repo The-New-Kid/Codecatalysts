@@ -1,7 +1,35 @@
 <template>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         
-        <div class="flex flex-col sm:flex-row justify-between items-center mb-12">
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-12">
+                    <div class="flex flex-wrap gap-4 mb-8">
+
+            <!-- Date picker -->
+            <input
+                type="date"
+                v-model="selectedDate"
+                @change="fetchParkingLots"
+                class="px-4 py-2 border rounded-lg shadow-sm"
+            />
+
+            <!-- Time slot dropdown -->
+            <select
+                v-model="selectedTimeSlot"
+                @change="fetchParkingLots"
+                class="px-4 py-2 border rounded-lg shadow-sm"
+            >
+                <option value="">Select Time Slot</option>
+                <option
+                    v-for="slot in timeSlots"
+                    :key="slot.id"
+                    :value="slot.id"
+                >
+                    {{ slot.start_time }} - {{ slot.end_time }}
+                </option>
+            </select>
+
+        </div>
+
             <h2
                 class="text-4xl sm:text-5xl font-extrabold text-red-800 
                        mb-4 sm:mb-0 drop-shadow-md font-serif"
@@ -98,7 +126,9 @@ import feather from 'feather-icons'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
 
-
+const selectedDate = ref('')
+const selectedTimeSlot = ref('')
+const timeSlots = ref([])
 const parkingLots = ref([])
 const loading = ref(true)
 const error = ref('')
@@ -108,8 +138,14 @@ const API_BASE = 'http://127.0.0.1:5000/api' // backend base
 const fetchParkingLots = async () => {
     loading.value = true
     error.value = ''
+
     try {
-        const res = await axios.get(`${API_BASE}/admin/parking-lots`)
+        const params = {}
+        if (selectedDate.value) params.date = selectedDate.value
+        if (selectedTimeSlot.value) params.timeslot_id = selectedTimeSlot.value
+
+        const res = await axios.get(`${API_BASE}/admin/parking-lots`, { params })
+
         parkingLots.value = res.data
     } catch (err) {
         console.error(err)
@@ -118,6 +154,7 @@ const fetchParkingLots = async () => {
         loading.value = false
     }
 }
+
 
 const onDeleteLot = async (id) => {
     if (!window.confirm('Are you sure you want to delete this parking lot?')) return
@@ -149,11 +186,24 @@ const spotLabel = (spot) => {
     return ''
 }
 
+
+const fetchTimeSlots = async () => {
+    try {
+        const res = await axios.get(`${API_BASE}/admin/time-slots`)
+        timeSlots.value = res.data
+    } catch (err) {
+        console.error(err)
+        alert("Failed to load time slots")
+    }
+}
+
 onMounted(() => {
     // Ensure Feather and AOS are initialized on the new page
     feather.replace() 
     AOS.init({ duration: 800, easing: 'ease-in-out', once: true })
-    
+    fetchTimeSlots()
+    fetchParkingLots()
+
     fetchParkingLots()
 })
 </script>

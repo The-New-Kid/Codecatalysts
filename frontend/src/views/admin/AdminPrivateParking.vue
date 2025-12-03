@@ -1,72 +1,108 @@
 <template>
-  <div class="max-w-7xl mx-auto mt-10 px-4 space-y-8">
-    <!-- Page Title -->
-    <h2 class="text-3xl font-extrabold text-center text-indigo-700 mb-8">
+  <div class="max-w-7xl mx-auto mt-10 px-4 space-y-10">
+
+    <!-- PAGE TITLE -->
+    <h2 class="text-4xl font-bold text-center text-indigo-700 tracking-tight">
       🔒 Private Parking Lots
     </h2>
 
-    <!-- Loading / Error -->
-    <div v-if="loading" class="text-center text-gray-600">
+    <!-- FILTERS -->
+    <div class="bg-white shadow-md rounded-2xl p-6 flex flex-col md:flex-row gap-4 items-center">
+      <div class="flex flex-col w-full">
+        <label class="text-sm text-gray-600 font-medium mb-1">Select Date</label>
+        <input 
+          type="date" 
+          v-model="selectedDate"
+          class="border rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-400 outline-none"
+        >
+      </div>
+
+      <div class="flex flex-col w-full">
+        <label class="text-sm text-gray-600 font-medium mb-1">Select Time Slot</label>
+<select
+  v-model="selectedTimeslot"
+  class="border rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-400 outline-none"
+>
+  <option disabled value="">-- Choose Timeslot --</option>
+  <option
+    v-for="ts in timeslots"
+    :key="ts.id"
+    :value="ts.id"
+  >
+    {{ ts.start_time }} - {{ ts.end_time }}
+  </option>
+</select>
+      </div>
+
+      <button
+        @click="fetchPrivateLots"
+        class="bg-indigo-600 text-white px-6 py-3 rounded-xl shadow hover:bg-indigo-700 transition font-medium"
+      >
+        Apply
+      </button>
+    </div>
+
+    <!-- LOADING -->
+    <div v-if="loading" class="text-center text-gray-500 text-lg animate-pulse">
       Loading private parking lots...
     </div>
-    <div v-else-if="error" class="text-center text-red-600">
+
+    <!-- ERROR -->
+    <div v-else-if="error" class="text-center text-red-600 text-lg">
       {{ error }}
     </div>
 
-    <!-- Lots Grid -->
+    <!-- LOTS GRID -->
     <div
       v-else
-      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
     >
       <div
         v-for="lot in privateLots"
         :key="lot.id"
-        class="bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition duration-300"
+        class="bg-white border rounded-2xl shadow hover:shadow-xl transition p-6 space-y-4"
       >
-        <!-- Lot Header -->
-        <div class="flex justify-between items-center mb-3">
-          <h3 class="text-lg font-semibold text-gray-800">
+        <!-- HEADER -->
+        <div class="flex justify-between items-center">
+          <h3 class="text-xl font-semibold text-gray-800">
             {{ lot.prime_location_name }}
           </h3>
-          <div class="flex items-center space-x-3">
-            <!-- Edit (same edit page as public lot) -->
+
+          <div class="flex items-center gap-3">
             <RouterLink
               :to="`/admin/parking-lots/${lot.id}/edit`"
-              class="text-green-600 font-medium hover:underline"
+              class="text-indigo-600 hover:underline"
             >
               Edit
             </RouterLink>
 
-            <!-- Delete -->
             <button
-              type="button"
-              class="text-red-600 font-medium hover:underline"
               @click="onDeleteLot(lot.id)"
+              class="text-red-500 hover:text-red-700 font-medium"
             >
               Delete
             </button>
           </div>
         </div>
 
-        <!-- Occupancy Info -->
-        <p class="text-gray-500 mb-3">
+        <!-- OCCUPANCY -->
+        <p class="text-gray-500 text-sm">
           Occupied:
-          <span class="font-semibold">
+          <span class="font-semibold text-gray-800">
             {{ lot.occupied_count }}/{{ lot.max_spots }}
           </span>
         </p>
 
-        <!-- Spot Grid -->
+        <!-- SPOT GRID -->
         <div class="grid grid-cols-5 gap-2">
           <RouterLink
             v-for="spot in lot.spots"
             :key="spot.id"
-            :to="`/admin/spots/${spot.id}`"
-            class="text-center py-1 rounded cursor-pointer text-sm font-medium
-                   hover:bg-green-300 hover:text-green-900"
+            :to="`/admin/spots/${spot.id}?date=${selectedDate}&timeslot=${selectedTimeslot}`"
+            class="text-center py-1 text-sm rounded-lg font-medium transition cursor-pointer"
             :class="spot.status === 'A'
-              ? 'bg-green-200 text-green-800 hover:bg-green-300'
-              : 'bg-red-200 text-red-800 hover:bg-red-300'"
+              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+              : 'bg-red-100 text-red-700 hover:bg-red-200'"
           >
             {{ spot.status }}
           </RouterLink>
@@ -74,59 +110,78 @@
       </div>
     </div>
 
-    <!-- Add Lot Button -->
-    <div class="text-center mt-6">
+    <!-- ADD LOT BUTTON -->
+    <div class="text-center mt-4">
       <RouterLink
         to="/admin/private-parking/add"
-        class="inline-block bg-yellow-400 text-white font-semibold px-6 py-3 rounded-xl shadow hover:bg-yellow-500 transition duration-200"
+        class="bg-yellow-500 text-white px-8 py-3 rounded-xl shadow hover:bg-yellow-600 transition font-semibold"
       >
-        + Add Lot
+        + Add Private Lot
       </RouterLink>
     </div>
+
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
 import axios from 'axios'
+import { RouterLink, useRouter } from 'vue-router'
 
 const API_BASE = 'http://127.0.0.1:5000/api'
 
 const privateLots = ref([])
 const loading = ref(true)
 const error = ref('')
-const router = useRouter()
+
+const selectedDate = ref('')
+const selectedTimeslot = ref('')
+
+const onDeleteLot = async (id) => {
+  if (!window.confirm('Delete this private parking lot?')) return
+
+  try {
+    await axios.delete(`${API_BASE}/admin/private-parking-lots/${id}`)
+    privateLots.value = privateLots.value.filter(lot => lot.id !== id)
+  } catch (err) {
+    alert(err.response?.data?.message || "Deletion failed.")
+  }
+}
+const timeslots = ref([]);
+
+const fetchTimeslots = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/admin/time-slots`);
+    timeslots.value = res.data;
+  } catch {
+    console.log("Failed to load timeslots");
+  }
+};
 
 const fetchPrivateLots = async () => {
-  loading.value = true
-  error.value = ''
-  try {
-    const res = await axios.get(`${API_BASE}/admin/private-parking-lots`)
-    privateLots.value = res.data
-  } catch (err) {
-    console.error(err)
-    error.value = 'Failed to load private parking lots.'
-  } finally {
-    loading.value = false
-  }
-}
+  loading.value = true;
+  error.value = "";
 
-const onDeleteLot = async (lotId) => {
-  if (!window.confirm('Are you sure you want to delete this private parking lot?')) return
   try {
-    await axios.delete(`${API_BASE}/admin/private-parking-lots/${lotId}`)
-    privateLots.value = privateLots.value.filter((lot) => lot.id !== lotId)
+    const res = await axios.get(`${API_BASE}/admin/private-parking-lots`, {
+      params: {
+        date: selectedDate.value,
+        timeslot_id: selectedTimeslot.value
+      }
+    });
+
+    privateLots.value = res.data;
   } catch (err) {
-    console.error(err)
-    alert(err.response?.data?.message || 'Failed to delete private lot.')
+    error.value = "Failed to load private parking lots.";
+  } finally {
+    loading.value = false;
   }
-}
+};
+
 
 onMounted(() => {
-  fetchPrivateLots()
-  if (window.AOS) {
-    window.AOS.init({ duration: 800, easing: 'ease-in-out', once: true })
-  }
-})
+  fetchTimeslots();
+  fetchPrivateLots();
+});
+
 </script>

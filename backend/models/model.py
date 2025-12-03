@@ -91,19 +91,6 @@ class Aarti_and_DarshanSlot(db.Model):
 
 #relationship bw passenger aarti,need to be reworked
 
-
-# class Booking(db.Model):
-#     __tablename__ = 'bookings'
-#     id = db.Column(db.Integer, primary_key=True)
-
-#     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-#     slot_id = db.Column(db.Integer, db.ForeignKey('darshan_slots.id', ondelete='CASCADE'), nullable=False)
-
-#     darshan_date = db.Column(db.Date, nullable=False)
-#     total_passengers = db.Column(db.Integer, nullable=False)
-#     user = db.relationship('User', backref='bookings')
-#     slot = db.relationship('DarshanSlot', backref='bookings')
-
 class Passenger(db.Model):
     __tablename__ = 'passengers'
     id = db.Column(db.Integer, primary_key=True)

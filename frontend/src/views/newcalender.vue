@@ -1,5 +1,5 @@
 <template>
-  <UserLayout>
+  <div>
     <div class="relative w-full h-[350px] lg:h-[450px] overflow-hidden shadow-2xl">
       <div class="absolute inset-0">
         <img 
@@ -91,13 +91,12 @@
         </div>
       </div>
     </div>
-  </UserLayout>
+    </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
-import UserLayout from "@/layouts/Userlayoutnew.vue"
 
 const BASE = "http://127.0.0.1:5000/api"
 

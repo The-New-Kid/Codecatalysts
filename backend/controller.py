@@ -501,11 +501,51 @@ api.add_resource(PanchangMonthResource, "/calender/month")
 # ============================
 
 class AdminParkingLotsResource(Resource):
+
+    # Helper function: check occupancy based on reservations
+    def is_spot_occupied(self, spot_id, date, timeslot_id):
+
+        # No date or timeslot = do NOT filter
+        if not date or not timeslot_id:
+            return False
+
+        pub = PublicReservation.query.filter_by(
+            spot_id=spot_id,
+            date_of_parking=date,
+            timeslot_id=timeslot_id
+        ).first()
+
+        if pub:
+            return True
+
+        priv = PrivateReservation.query.filter_by(
+            spot_id=spot_id,
+            date_of_parking=date,
+            timeslot_id=timeslot_id
+        ).first()
+
+        return priv is not None
+
+
     def get(self):
         """
-        Returns all NON-private parking lots with colored_spots,
-        same logic as admin_dashboard in Jinja controller.
+        Returns PUBLIC (non-private) parking lots.
+        Supports filtering:
+        /admin/parking-lots?date=YYYY-MM-DD&timeslot_id=2
         """
+
+        # Read filters
+        date_str = request.args.get("date")
+        timeslot_id = request.args.get("timeslot_id", type=int)
+
+        selected_date = None
+        if date_str:
+            try:
+                selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except:
+                return {"message": "Invalid date format"}, 400
+
+        # Search filter
         query = request.args.get('q', '').strip()
         if query:
             search = f"%{query}%"
@@ -518,29 +558,35 @@ class AdminParkingLotsResource(Resource):
 
         lots_data = []
 
+        # Build response for each lot
         for lot in parking_lots:
             total = lot.max_spots
+
+            # Edge case: empty lot
             if total <= 0:
                 lots_data.append({
                     "id": lot.id,
                     "prime_location_name": lot.prime_location_name,
-                    "max_spots": lot.max_spots,
+                    "max_spots": 0,
                     "occupied_count": 0,
                     "colored_spots": []
                 })
                 continue
 
+            # Distribution: 60% normal, 30% extra, 10% VIP
             normal_count = int(0.6 * total)
             extra_count = int(0.3 * total)
             vip_count = int(0.1 * total)
 
             assigned = normal_count + extra_count + vip_count
             remainder = total - assigned
-            extra_count += remainder
+            extra_count += remainder  # add remainder to extra
 
             colored_spots = []
-            # same order as Jinja: iterate lot.spots with index
+
             for idx, spot in enumerate(lot.spots):
+
+                # ----- Determine COLOR -----
                 if idx < normal_count:
                     color = 'green'
                 elif idx < normal_count + extra_count:
@@ -548,29 +594,47 @@ class AdminParkingLotsResource(Resource):
                 else:
                     color = 'pink'
 
+                # ----- Determine OCCUPANCY -----
+                if selected_date and timeslot_id:
+                    occupied = self.is_spot_occupied(
+                        spot.id, selected_date, timeslot_id
+                    )
+                    status = 'O' if occupied else 'A'
+                else:
+                    status = spot.status
+
                 colored_spots.append({
                     "id": spot.id,
-                    "status": spot.status,
+                    "status": status,
                     "color": color
                 })
 
-            occupied_count = sum(1 for s in lot.spots if s.status == 'O')
+            # Count occupied
+            if selected_date and timeslot_id:
+                occupied_count = sum(
+                    1 for s in lot.spots
+                    if self.is_spot_occupied(s.id, selected_date, timeslot_id)
+                )
+            else:
+                occupied_count = sum(
+                    1 for s in lot.spots if s.status == 'O'
+                )
 
             lots_data.append({
                 "id": lot.id,
                 "prime_location_name": lot.prime_location_name,
-                "max_spots": lot.max_spots,
+                "max_spots": total,
                 "occupied_count": occupied_count,
                 "colored_spots": colored_spots
             })
 
         return lots_data, 200
+
+
+
     def post(self):
         """
         Create a new parking lot.
-        Mirrors Jinja add_lot route:
-        - Creates ParkingLot
-        - Creates ParkingSpot entries based on max_spots
         """
         data = request.get_json() or {}
 
@@ -594,7 +658,6 @@ class AdminParkingLotsResource(Resource):
         if max_spots <= 0:
             return {"message": "Max spots must be positive."}, 400
 
-        # Create lot (assuming is_private default False for public lots)
         new_lot = ParkingLot(
             prime_location_name=prime_location_name,
             address=address,
@@ -605,13 +668,13 @@ class AdminParkingLotsResource(Resource):
         )
 
         db.session.add(new_lot)
-        db.session.flush()  # to get new_lot.id before commit
+        db.session.flush()  # Get ID before commit
 
-        # Create ParkingSpot rows
+        # Create spot rows
         for _ in range(max_spots):
             spot = ParkingSpot(
                 lot_id=new_lot.id,
-                status='A'   # Available by default
+                status='A'
             )
             db.session.add(spot)
 
@@ -630,6 +693,8 @@ class AdminParkingLotsResource(Resource):
             }
         }, 201
 
+
+
 class AdminParkingLotResource(Resource):
     def delete(self, lot_id):
         lot = ParkingLot.query.get(lot_id)
@@ -638,53 +703,46 @@ class AdminParkingLotResource(Resource):
 
         db.session.delete(lot)
         db.session.commit()
+
         return {"message": "Parking lot deleted successfully"}, 200
 
 
-api.add_resource(AdminParkingLotsResource, "/admin/parking-lots")
-api.add_resource(AdminParkingLotResource, "/admin/parking-lots/<int:lot_id>")
 
-#Added
 class AdminSpotResource(Resource):
+
     def get(self, spot_id):
         """
-        Same as Jinja spot_detail:
-        - compute color based on distribution in this lot
-        - return spot + lot info
+        Returns individual spot data (no changes needed here).
         """
+
         spot = ParkingSpot.query.get(spot_id)
         if not spot:
             return {"message": "Spot not found"}, 404
 
         lot = spot.lot
+        total = lot.max_spots
 
-        # color logic copied from /spot/<spot_id>
-        if not lot.is_private:
-            total = lot.max_spots
-            normal_count = int(0.6 * total)
-            extra_count = int(0.3 * total)
-            vip_count = int(0.1 * total)
-            assigned = normal_count + extra_count + vip_count
-            remainder = total - assigned
-            extra_count += remainder
+        normal_count = int(0.6 * total)
+        extra_count = int(0.3 * total)
+        vip_count = int(0.1 * total)
+        assigned = normal_count + extra_count + vip_count
+        remainder = total - assigned
+        extra_count += remainder
 
-            # spot index in lot.spots (same as Jinja)
-            spots_list = list(lot.spots)
-            spot_index = spots_list.index(spot)
+        spots_list = list(lot.spots)
+        index = spots_list.index(spot)
 
-            if spot_index < normal_count:
-                color = 'green'
-            elif spot_index < normal_count + extra_count:
-                color = 'grey'
-            else:
-                color = 'pink'
-        else:
+        if index < normal_count:
             color = 'green'
+        elif index < normal_count + extra_count:
+            color = 'grey'
+        else:
+            color = 'pink'
 
         return {
             "spot": {
                 "id": spot.id,
-                "status": spot.status,  # 'A' or 'O'
+                "status": spot.status,
                 "color": color,
                 "lot_id": lot.id
             },
@@ -695,12 +753,8 @@ class AdminSpotResource(Resource):
             }
         }, 200
 
+
     def delete(self, spot_id):
-        """
-        Same rules as Jinja delete_spot:
-        - only delete if spot.status == 'A'
-        - decrement lot.max_spots
-        """
         spot = ParkingSpot.query.get(spot_id)
         if not spot:
             return {"message": "Spot not found"}, 404
@@ -716,7 +770,32 @@ class AdminSpotResource(Resource):
         db.session.commit()
 
         return {"message": "Spot deleted successfully."}, 200
+
+
+
+# NEW ENDPOINT: Return all time slots for dropdown
+class AdminTimeSlotResource(Resource):
+    def get(self):
+        slots = ParkingTimeSlot.query.all()
+
+        return [
+            {
+                "id": slot.id,
+                "start_time": slot.start_time.strftime("%H:%M"),
+                "end_time": slot.end_time.strftime("%H:%M")
+            }
+            for slot in slots
+        ], 200
+
+
+
+# Register API routes
+api.add_resource(AdminParkingLotsResource, "/admin/parking-lots")
+api.add_resource(AdminParkingLotResource, "/admin/parking-lots/<int:lot_id>")
 api.add_resource(AdminSpotResource, '/admin/spots/<int:spot_id>')
+api.add_resource(AdminTimeSlotResource, "/admin/time-slots")
+
+
 class FestivalListResource(Resource):
     def get(self):
         # Static list abhi ke liye; baad me DB se bhi de sakte hain
@@ -766,26 +845,60 @@ api.add_resource(FestivalListResource, '/festivals')
 #added
 class AdminPrivateParkingLotsResource(Resource):
     def get(self):
-        """Return all private parking lots + sorted spots."""
+        """Return private lots + spot occupancy for selected date & timeslot."""
+        date_str = request.args.get("date")
+        timeslot_id = request.args.get("timeslot_id")
+
+        selected_date = None
+        if date_str:
+            try:
+                selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except:
+                return {"message": "Invalid date format. Use YYYY-MM-DD"}, 400
+
         private_lots = ParkingLot.query.filter_by(is_private=True).all()
         lots_data = []
 
         for lot in private_lots:
             spots_sorted = sorted(lot.spots, key=lambda s: s.id)
-            occupied_count = sum(1 for s in spots_sorted if s.status == 'O')
+            spots_data = []
+            occupied_count = 0
+
+            for spot in spots_sorted:
+
+                # Default available
+                status = "A"
+
+                # If date + timeslot selected, check if reservation exists
+                if selected_date and timeslot_id:
+                    reservation = PrivateReservation.query.filter_by(
+                        spot_id=spot.id,
+                        date_of_parking=selected_date,
+                        timeslot_id=timeslot_id
+                    ).first()
+
+                    if reservation:
+                        status = "O"
+
+                # Count only within selected filter
+                if status == "O":
+                    occupied_count += 1
+
+                spots_data.append({
+                    "id": spot.id,
+                    "status": status
+                })
 
             lots_data.append({
                 "id": lot.id,
                 "prime_location_name": lot.prime_location_name,
                 "max_spots": lot.max_spots,
                 "occupied_count": occupied_count,
-                "spots": [
-                    {"id": s.id, "status": s.status}
-                    for s in spots_sorted
-                ]
+                "spots": spots_data
             })
 
         return lots_data, 200
+
 class AdminPrivateLotResource(Resource):
     def delete(self, lot_id):
         lot = ParkingLot.query.get(lot_id)
@@ -1254,7 +1367,7 @@ class BookParking(Resource):
                         spot_id=spot.id,
                         user_id=user_id,
                         vehicle_number=vehicle,
-                        date_of_parking=date,
+                        date_of_parking=datetime.strptime(date, "%Y-%m-%d"),
                         timeslot_id=slot_id
                     )
                     db.session.add(res)
@@ -1300,7 +1413,7 @@ class BookParking(Resource):
                             spot_id=spot.id,
                             user_id=user_id,
                             vehicle_number=vehicle,
-                            date_of_parking=date,
+                            date_of_parking=datetime.strptime(date, "%Y-%m-%d"),
                             timeslot_id=s.id
                         )
                         db.session.add(r)
@@ -1310,3 +1423,47 @@ class BookParking(Resource):
 
             return {"message": "No spot available for the requested time range"}, 409
 api.add_resource(BookParking,'/book-parking')
+
+
+class SlotAvailabilityResource(Resource):
+    def get(self):
+        slot_type = request.args.get('type')
+        date_str = request.args.get('date')  # yyyy-mm-dd format
+
+        if not slot_type:
+            return {"message": "Slot type required"}, 400
+
+        if not date_str:
+            return {"message": "Date required"}, 400
+
+        try:
+            selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except:
+            return {"message": "Invalid date format, must be YYYY-MM-DD"}, 400
+
+        # Fetch all slots of this type (Aarti or Darshan)
+        slots = Aarti_and_DarshanSlot.query.filter_by(slot_type=slot_type).all()
+
+        results = []
+
+        for slot in slots:
+            # Count passengers for this slot on that date
+            booked_count = Passenger.query.filter_by(
+                slot_id=slot.id,
+                darshan_date=selected_date
+            ).count()
+
+            results.append({
+                "slot_id": slot.id,
+                "slot_type": slot.slot_type,
+                "start": slot.start_time.strftime("%H:%M"),
+                "end": slot.end_time.strftime("%H:%M"),
+                "capacity": slot.max_visitors,
+                "booked": booked_count,
+                "available": slot.max_visitors - booked_count
+            })
+
+        return {"slots": results}, 200
+
+
+api.add_resource(SlotAvailabilityResource, "/slots")

@@ -389,21 +389,16 @@ function checkTatkalWindow() {
   const minute = now.getMinutes();
 
   const current = hour * 60 + minute;      // convert time to minutes
-  const start = 7 * 60;                   // 7 AM
-  const end = 9 * 60;                     // 9 AM
+  const start = 7 * 60;                   // 7 AM           
 
-  if (current >= start && current < end) {
+  if (current >= start ) {
     isTatkalOpen.value = true;
     openMessage.value = "Open Now";
   } 
-  else if (current < start) {
+  else {
     isTatkalOpen.value = false;
     openMessage.value = "Opens at 7:00 AM";
   } 
-  else {
-    isTatkalOpen.value = false;
-    openMessage.value = "Closed at 9:00 AM";
-  }
 }
 
 checkTatkalWindow();
