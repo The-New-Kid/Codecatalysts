@@ -1,0 +1,22 @@
+# Python virtual environment
+myvenv/
+
+instance/
+# Python cache files
+__pycache__/
+*.pyc
+
+# Node modules for frontend
+node_modules/
+dist/
+
+# Environment files
+#.env
+static/qrcode/
+# VS Code settings
+.vscode/
+
+# MacOS files
+.DS_Store
+
+templates/

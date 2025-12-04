@@ -1,0 +1,9 @@
+{
+  "appId": "com.Devdham.app",
+  "appName": "Devdham",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}
