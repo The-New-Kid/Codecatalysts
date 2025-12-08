@@ -1,112 +1,113 @@
 <template>
   <div>
-    <div class="relative w-full h-[300px] sm:h-[400px] overflow-hidden shadow-2xl">
+
+    <!-- ✅ RESPONSIVE HEADER -->
+    <div class="relative w-full h-[200px] sm:h-[300px] md:h-[400px] overflow-hidden shadow-2xl">
       <div class="absolute inset-0">
         <img 
           src="/images/Somnath4.jpeg" 
           alt="Temple Aarti Banner" 
           class="w-full h-full object-cover object-center"
         />
-        <div class="absolute inset-0 bg-red-900/80 via-red-900/40 to-black/30"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-red-900/80 via-red-900/40 to-black/30"></div>
       </div>
 
-      <div class="relative z-10 flex flex-col items-center justify-center h-full text-center px-4" data-aos="fade-up">
-        <h2 class="text-4xl md:text-5xl font-serif font-bold text-yellow-100 mb-2 drop-shadow-lg animate-fade-in-up">
+      <div class="relative z-10 flex flex-col items-center justify-center h-full text-center px-3 sm:px-4" data-aos="fade-up">
+        <h2 class="text-2xl sm:text-4xl md:text-5xl font-serif font-bold text-yellow-100 mb-2 drop-shadow-lg animate-fade-in-up">
           🪔 Aarti Ticket Booking
         </h2>
-        <p class="text-lg md:text-xl text-yellow-200 max-w-2xl mx-auto font-light drop-shadow-md">
+        <p class="text-sm sm:text-lg md:text-xl text-yellow-200 max-w-2xl mx-auto font-light drop-shadow-md">
           Secure your sacred visit to the divine abode.
         </p>
       </div>
     </div>
-    
-    <div class="min-h-screen flex justify-center items-start bg-[#fffaf0] py-10">
-      <div class="w-full max-w-3xl bg-white rounded-3xl shadow-2xl p-6 sm:p-10 border-t-8 border-red-700" data-aos="fade-up" data-aos-delay="200">
 
-        <h3 class="text-2xl font-serif font-bold text-center mb-8 text-red-800">
+    <!-- ✅ BODY -->
+    <div class="min-h-screen flex justify-center items-start bg-[#fffaf0] py-6 sm:py-10 px-3 sm:px-6">
+
+      <div class="w-full max-w-3xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl p-5 sm:p-10 border-t-8 border-red-700"
+           data-aos="fade-up" data-aos-delay="200">
+
+        <h3 class="text-xl sm:text-2xl font-serif font-bold text-center mb-6 sm:mb-8 text-red-800">
           Devotee Information
         </h3>
 
-        <div class="space-y-6">
+        <div class="space-y-5 sm:space-y-6">
           <div>
-            <label class="block font-semibold mb-1 text-gray-700">Booker Name</label>
-            <input v-model="booker.name" class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300 shadow-sm" />
+            <label class="block font-semibold mb-1 text-gray-700 text-sm sm:text-base">Booker Name</label>
+            <input v-model="booker.name"
+              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition shadow-sm" />
           </div>
 
           <div>
-            <label class="block font-semibold mb-1 text-gray-700">Email</label>
-            <input v-model="booker.email" type="email" class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300 shadow-sm" />
+            <label class="block font-semibold mb-1 text-gray-700 text-sm sm:text-base">Email</label>
+            <input v-model="booker.email" type="email"
+              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition shadow-sm" />
           </div>
 
           <div>
-            <label class="block font-semibold mb-1 text-gray-700">Mobile Number</label>
-            <input v-model="booker.mobile" class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300 shadow-sm" />
+            <label class="block font-semibold mb-1 text-gray-700 text-sm sm:text-base">Mobile Number</label>
+            <input v-model="booker.mobile"
+              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition shadow-sm" />
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div>
               <label class="block font-semibold mb-1 text-gray-700">Select Aarti Date</label>
-              <input
-                type="date"
-                v-model="selectedDate"
-                :min="minDate"
-                :max="maxDate"
-                class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300 shadow-sm"
-              />
+              <input type="date" v-model="selectedDate" :min="minDate" :max="maxDate"
+                class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition shadow-sm" />
             </div>
 
             <div>
               <label class="block font-semibold mb-1 text-gray-700">Number of Tickets</label>
-              <input
-                type="number"
-                min="1"
-                v-model.number="numMembers"
-                @input="generatePassengers"
-                class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300 shadow-sm"
-              />
+              <input type="number" min="1" v-model.number="numMembers" @input="generatePassengers"
+                class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition shadow-sm" />
             </div>
           </div>
         </div>
-        
-        <hr class="my-10 border-red-100" />
 
-        <h3 class="text-2xl font-serif font-bold text-center mb-8 text-red-800">
+        <hr class="my-8 sm:my-10 border-red-100" />
+
+        <h3 class="text-xl sm:text-2xl font-serif font-bold text-center mb-6 sm:mb-8 text-red-800">
           Devotee Details & Verification
         </h3>
 
-        <div 
-          v-for="(p, i) in passengers" 
-          :key="i" 
-          class="mt-6 p-5 sm:p-6 rounded-xl bg-red-50 border border-red-200 shadow-lg darshan-card" 
-          :data-aos="i % 2 === 0 ? 'fade-right' : 'fade-left'"
-          :data-aos-delay="300 + (i * 100)"
+        <div
+          v-for="(p, i) in passengers"
+          :key="i"
+          class="mt-5 p-4 sm:p-6 rounded-xl bg-red-50 border border-red-200 shadow-lg darshan-card"
         >
-
-          <h4 class="font-bold text-red-700 mb-4 text-lg border-b border-red-200 pb-2 flex items-center">
-            <span class="mr-2 text-xl">👤</span> Devotee {{ i + 1 }}
+          <h4 class="font-bold text-red-700 mb-3 text-base sm:text-lg flex items-center">
+            <span class="mr-2">👤</span> Devotee {{ i + 1 }}
           </h4>
 
-          <input v-model="p.name" class="w-full p-3 border rounded-lg mb-3 focus:border-red-600" placeholder="Passenger Name" />
+          <input v-model="p.name"
+            class="w-full p-2.5 sm:p-3 border rounded-lg mb-3"
+            placeholder="Passenger Name" />
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-            <input v-model="p.aadhar" class="w-full p-3 border rounded-lg focus:border-red-600" placeholder="Aadhar Number" />
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <input v-model="p.aadhar"
+              class="w-full p-2.5 sm:p-3 border rounded-lg"
+              placeholder="Aadhar Number" />
 
             <button
-              class="bg-red-700 text-white rounded-lg px-4 py-2 font-semibold hover:bg-red-800 transition duration-300 disabled:opacity-50 disabled:bg-gray-400"
+              class="bg-red-700 text-white rounded-lg px-4 py-2 font-semibold disabled:bg-gray-400"
               @click="sendOtp(i)"
               :disabled="p.cooldown > 0 || p.verified"
             >
               <span v-if="p.cooldown > 0">Resend in {{ p.cooldown }}s</span>
-              <span v-else-if="p.verified" class="flex items-center justify-center">OTP Sent ✓</span>
+              <span v-else-if="p.verified">OTP Sent ✓</span>
               <span v-else>Send OTP</span>
             </button>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input v-model="p.otp" class="w-full p-3 border rounded-lg focus:border-red-600" placeholder="Enter OTP" />
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input v-model="p.otp"
+              class="w-full p-2.5 sm:p-3 border rounded-lg"
+              placeholder="Enter OTP" />
 
             <button
-              class="bg-green-600 text-white rounded-lg px-4 py-2 font-semibold hover:bg-green-700 transition duration-300 disabled:opacity-50 disabled:bg-gray-400"
+              class="bg-green-600 text-white rounded-lg px-4 py-2 font-semibold disabled:bg-gray-400"
               @click="verifyOtp(i)"
               :disabled="p.verified || !p.otpSent"
             >
@@ -118,12 +119,15 @@
             {{ p.status }}
           </p>
         </div>
-        
-        <hr class="my-10 border-red-100" />
 
-        <div class="mt-8">
-          <label class="block font-serif font-bold mb-2 text-red-800 text-xl">Select Aarti Slot</label>
-          <select v-model="selectedSlot" class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300 shadow-sm bg-white">
+        <hr class="my-8 sm:my-10 border-red-100" />
+
+        <div class="mt-6 sm:mt-8">
+          <label class="block font-serif font-bold mb-2 text-red-800 text-lg sm:text-xl">
+            Select Aarti Slot
+          </label>
+          <select v-model="selectedSlot"
+            class="w-full p-3 border-2 border-gray-300 rounded-xl bg-white">
             <option value="">-- Select Slot --</option>
             <option v-for="s in slots" :key="s.id" :value="s.id">
               {{ s.slot_type }} | {{ s.start }} - {{ s.end }}
@@ -132,22 +136,23 @@
         </div>
 
         <button
-          class="w-full py-4 mt-10 rounded-full bg-gradient-to-r from-red-700 to-red-900 text-white font-bold text-lg shadow-xl hover:shadow-2xl hover:from-red-800 hover:to-red-900 transition duration-300 transform hover:scale-[1.01] tracking-wider"
+          class="w-full py-3 sm:py-4 mt-8 sm:mt-10 rounded-full
+                 bg-gradient-to-r from-red-700 to-red-900 text-white
+                 font-bold text-base sm:text-lg shadow-xl"
           @click="bookTickets"
-          data-aos="zoom-in"
-          data-aos-delay="500"
         >
-          Book Aarti Tickets (Submit)
+          Book Aarti Tickets
         </button>
-        
-        <p class="text-center text-sm text-gray-500 mt-4">
-            By clicking Book Ticket, you agree to the temple's terms and conditions.
+
+        <p class="text-center text-xs sm:text-sm text-gray-500 mt-4">
+          By clicking Book Ticket, you agree to the temple's terms and conditions.
         </p>
 
       </div>
     </div>
   </div>
 </template>
+
 
 <script setup>
 import { ref, onMounted } from "vue"
@@ -161,10 +166,10 @@ onMounted(() => {
   AOS.init({ duration: 800, once: true })
 })
 
-const BASE = `${import.meta.env.VITE_API_URL}`
+const BASE =`${import.meta.env.VITE_API_URL}`
 const userStore = useUserStore()
 
-// Variable names and logic remain **unchanged**
+// Variable names and logic remain *unchanged*
 const booker = ref({ name: userStore.name, email: "", mobile: "" })
 const numMembers = ref(1)
 const passengers = ref([])
@@ -224,7 +229,7 @@ async function sendOtp(index) {
 
 async function verifyOtp(index) {
   const p = passengers.value[index]
-  const res = await axios.post(`${BASE}/verify-otp`, { aadhar: p.aadhar, otp: p.otp })
+  const res = await axios.post(`${BASE}`/verify-otp, { aadhar: p.aadhar, otp: p.otp })
   p.verified = res.data.success
   p.status = p.verified ? "Verified ✓" : "OTP Invalid"
 }

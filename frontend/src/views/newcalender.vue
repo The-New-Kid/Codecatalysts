@@ -1,75 +1,97 @@
 <template>
   <div>
-    <div class="relative w-full h-[350px] lg:h-[450px] overflow-hidden shadow-2xl">
+
+    <!-- ✅ RESPONSIVE BANNER -->
+    <div class="relative w-full h-[200px] sm:h-[300px] lg:h-[450px] overflow-hidden shadow-2xl">
       <div class="absolute inset-0">
         <img 
-            src="/images/somnath2.jpeg" 
-            alt="Temple Banner" 
-            class="w-full h-full object-cover object-center animate-slow-zoom"
+          src="/images/somnath2.jpeg" 
+          alt="Temple Banner" 
+          class="w-full h-full object-cover object-center animate-slow-zoom"
         />
         <div class="absolute inset-0 bg-gradient-to-t from-red-900/95 via-red-900/60 to-black/40"></div>
       </div>
 
-      <div class="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-        <h1 class="text-3xl md:text-5xl font-serif font-bold text-white mb-4 drop-shadow-lg tracking-wide animate-fade-in-down">
+      <div class="relative z-10 flex flex-col items-center justify-center h-full text-center px-3 sm:px-4">
+        <h1 class="text-xl sm:text-3xl md:text-5xl font-serif font-bold text-white mb-3 sm:mb-4 drop-shadow-lg tracking-wide animate-fade-in-down">
           📅 Festival & Crowd Density Calendar
         </h1>
-        <p class="text-lg text-yellow-100 max-w-2xl mx-auto font-light drop-shadow-md animate-fade-in-up">
+        <p class="text-sm sm:text-lg text-yellow-100 max-w-2xl mx-auto font-light drop-shadow-md animate-fade-in-up">
           Plan your darshan by checking daily tithis and expected crowd levels.
         </p>
       </div>
     </div>
 
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 relative z-20 -mt-16">
+    <!-- ✅ CONTENT WRAPPER -->
+    <div class="max-w-6xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 pb-20 relative z-20 -mt-12 sm:-mt-16">
       
-      <div class="bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border-t-4 border-orange-600 overflow-hidden p-4 md:p-8">
+      <div class="bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border-t-4 border-orange-600 overflow-hidden p-3 sm:p-4 md:p-8">
 
-        <div class="flex flex-col md:flex-row justify-between items-center mb-8 bg-orange-50 p-4 rounded-xl border border-orange-100">
+        <!-- ✅ HEADER CONTROLS -->
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 sm:mb-8 bg-orange-50 p-3 sm:p-4 rounded-xl border border-orange-100 gap-3 sm:gap-0">
+          
           <button 
             @click="prevMonth" 
-            class="group px-6 py-2.5 bg-red-800 hover:bg-red-900 text-white font-semibold rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 mb-4 md:mb-0 active:scale-95"
+            class="group w-full sm:w-auto px-5 py-2 bg-red-800 hover:bg-red-900 text-white font-semibold rounded-lg shadow-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-95"
           >
             <span class="group-hover:-translate-x-1 transition-transform">←</span> Prev
           </button>
 
           <div class="text-center">
-            <h2 class="text-3xl font-serif font-bold text-red-900">
+            <h2 class="text-xl sm:text-3xl font-serif font-bold text-red-900">
               {{ monthName }} <span class="text-orange-700">{{ currentYear }}</span>
             </h2>
           </div>
           
           <button 
             @click="nextMonth" 
-            class="group px-6 py-2.5 bg-red-800 hover:bg-red-900 text-white font-semibold rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 mt-4 md:mt-0 active:scale-95"
+            class="group w-full sm:w-auto px-5 py-2 bg-red-800 hover:bg-red-900 text-white font-semibold rounded-lg shadow-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-95"
           >
             Next <span class="group-hover:translate-x-1 transition-transform">→</span>
           </button>
         </div>
 
+        <!-- ✅ ERROR -->
         <div v-if="error" class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 text-center text-red-700 font-bold rounded-md">
-          ⚠️ Failed to load calendar data. Please try again later.
+          ⚠ Failed to load calendar data. Please try again later.
         </div>
 
-        <div class="grid grid-cols-7 mb-4">
-          <div v-for="d in days" :key="d" class="text-center font-bold text-red-800 uppercase tracking-wider text-sm md:text-base py-2">
+        <!-- ✅ DAY HEADERS -->
+        <div class="grid grid-cols-7 mb-2 sm:mb-4">
+          <div 
+            v-for="d in days" 
+            :key="d" 
+            class="text-center font-bold text-red-800 uppercase tracking-wider text-[10px] sm:text-sm md:text-base py-1 sm:py-2"
+          >
             {{ d }}
           </div>
         </div>
 
-        <div class="grid grid-cols-7 gap-2 md:gap-4">
+        <!-- ✅ CALENDAR GRID -->
+        <div class="grid grid-cols-7 gap-1 sm:gap-2 md:gap-4">
 
-          <div v-for="blank in startDay" :key="'b'+blank" class="bg-gray-50/50 rounded-xl"></div>
+          <div 
+            v-for="blank in startDay" 
+            :key="'b'+blank" 
+            class="bg-gray-50/50 rounded-xl min-h-[60px] sm:min-h-[110px]"
+          ></div>
 
+          <!-- ✅ LOADING -->
           <template v-if="loading">
-            <div v-for="n in totalDays" :key="n"
-                 class="warm-skeleton rounded-xl h-28 md:h-36">
+            <div 
+              v-for="n in totalDays" 
+              :key="n"
+              class="warm-skeleton rounded-xl h-20 sm:h-28 md:h-36">
             </div>
           </template>
 
+          <!-- ✅ DAY CELLS -->
           <template v-else>
-            <div v-for="(day, index) in totalDays" :key="day"
-                 class="group relative bg-white border border-orange-100 rounded-xl p-2 md:p-4 flex flex-col justify-between overflow-hidden min-h-[110px] md:min-h-[140px] cursor-pointer transition-all duration-300 ease-out hover:z-10 hover:border-orange-400 hover:shadow-[0_10px_25px_-5px_rgba(234,88,12,0.3)] hover:-translate-y-2 stagger-anim"
-                 :style="{ animationDelay: `${index * 30}ms` }"
+            <div 
+              v-for="(day, index) in totalDays" 
+              :key="day"
+              class="group relative bg-white border border-orange-100 rounded-xl p-1.5 sm:p-3 md:p-4 flex flex-col justify-between overflow-hidden min-h-[80px] sm:min-h-[110px] md:min-h-[140px] cursor-pointer transition-all duration-300 ease-out hover:z-10 hover:border-orange-400 hover:shadow-[0_10px_25px_-5px_rgba(234,88,12,0.3)] hover:-translate-y-1 sm:hover:-translate-y-2 stagger-anim"
+              :style="{ animationDelay: `${index * 30}ms` }"
             >
               
               <div class="absolute inset-0 bg-gradient-to-br from-orange-50 via-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -77,27 +99,29 @@
               <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-300 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
               <div class="relative z-10 text-center">
-                <span class="font-bold text-2xl md:text-3xl text-red-900/80 block mb-1 md:mb-2 group-hover:text-red-700 group-hover:scale-110 transition-all duration-300">{{ day }}</span>
+                <span class="font-bold text-lg sm:text-2xl md:text-3xl text-red-900/80 block mb-0.5 sm:mb-2 group-hover:text-red-700 transition-all duration-300">
+                  {{ day }}
+                </span>
               </div>
               
-<div class="relative z-10 text-center">
-  <small 
-    class="text-xs md:text-sm font-medium line-clamp-2 leading-tight px-1 py-1 rounded-lg block w-full transition-colors"
-    :class="{
-      'text-orange-800/70 bg-orange-50 group-hover:bg-orange-100 group-hover:text-orange-900': !tithiMap[day]?.fest,
-      'text-red-900 font-bold bg-red-100 group-hover:bg-red-200 group-hover:text-red-800 border border-red-400': tithiMap[day]?.fest
-    }"
-  >
-    {{ tithiMap[day]?.tithi || 'No Data' }}
-  </small>
+              <div class="relative z-10 text-center">
+                <small 
+                  class="text-[9px] sm:text-xs md:text-sm font-medium line-clamp-2 leading-tight px-1 py-0.5 rounded-lg block w-full transition-colors"
+                  :class="{
+                    'text-orange-800/70 bg-orange-50 group-hover:bg-orange-100 group-hover:text-orange-900': !tithiMap[day]?.fest,
+                    'text-red-900 font-bold bg-red-100 group-hover:bg-red-200 group-hover:text-red-800 border border-red-400': tithiMap[day]?.fest
+                  }"
+                >
+                  {{ tithiMap[day]?.tithi || 'No Data' }}
+                </small>
 
-  <div 
-    v-if="tithiMap[day]?.fest"
-    class="text-[10px] md:text-xs font-semibold text-red-700 mt-1"
-  >
-    🛕 {{ tithiMap[day].fest }}
-  </div>
-</div>
+                <div 
+                  v-if="tithiMap[day]?.fest"
+                  class="text-[9px] sm:text-[10px] md:text-xs font-semibold text-red-700 mt-0.5 sm:mt-1"
+                >
+                  🛕 {{ tithiMap[day].fest }}
+                </div>
+              </div>
 
             </div>
           </template>
@@ -105,7 +129,7 @@
         </div>
       </div>
     </div>
-    </div>
+  </div>
 </template>
 
 <script setup>

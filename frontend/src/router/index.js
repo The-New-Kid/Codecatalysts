@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '../stores/user'
 
 // Views
+import TempleDonation from '../views/TempleDonation.vue'
 import Book_aarti_Tatkal from '../views/Book_aarti_Tatkal.vue'
 import Book_Darshan_Tatkal from '../views/Book_Darshan_Tatkal.vue'
 import UserLayoutforcalender from '../layouts/userlayoutforcalender.vue'
@@ -16,7 +17,7 @@ import UserEditnew from '../views/UserEditnew.vue'
 import BookDarshanNew from '../views/book_darshannew.vue'
 import NewCalender from '../views/newcalender.vue'
 import MobileLogin from '../views/mobile-login.vue'
-import BookAarti from '../views/Book_Aarti.vue'
+import BookAarti from '../views/Book_aarti.vue'
 
 // Admin Views
 import AdminDarshanDetails from '../views/admin/Admin_Darshan_details.vue'
@@ -82,11 +83,18 @@ const routes = [
         name:'book_darshan_tatkal',
         component:Book_Darshan_Tatkal,
     },
+    // NEW ROUTE ADDED FOR TEMPLE DONATION (Fixes the link from the Dashboard)
+    {
+        path: 'donation',
+        name: 'temple-donation',
+        component: TempleDonation,
+    },
     {
         path:'book_aarti_tatkal',
         name:'book_aarti_tatkal',
         component:Book_aarti_Tatkal
-    },]
+    },
+]
 },
     // Public routes
     { path: '/', name: 'home', component: HomeView },
