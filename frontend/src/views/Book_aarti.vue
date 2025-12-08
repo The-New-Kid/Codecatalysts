@@ -100,7 +100,18 @@
               <span v-else>Send OTP</span>
             </button>
           </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <input v-model="p.age" type="number" placeholder="Age"
+              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl" />
 
+            <select v-model="p.gender"
+              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl bg-white">
+              <option value="">Select Gender</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
+            </select>
+          </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input v-model="p.otp"
               class="w-full p-2.5 sm:p-3 border rounded-lg"
@@ -155,29 +166,32 @@
 
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, onBeforeUnmount } from "vue"
 import axios from "axios"
 import { useUserStore } from "@/stores/user"
 import AOS from 'aos'
 import 'aos/dist/aos.css'
 
-// Initialize AOS (for animations)
 onMounted(() => {
   AOS.init({ duration: 800, once: true })
 })
 
-const BASE =`${import.meta.env.VITE_API_URL}`
+const BASE = `${import.meta.env.VITE_API_URL}`
 const userStore = useUserStore()
 
-// Variable names and logic remain *unchanged*
-const booker = ref({ name: userStore.name, email: "", mobile: "" })
+const booker = ref({ 
+  name: userStore.name || "", 
+  email: userStore.email || "", 
+  mobile: userStore.mobile || "" 
+})
+
 const numMembers = ref(1)
 const passengers = ref([])
 const slots = ref([])
 const selectedSlot = ref("")
 const selectedDate = ref("")
 
-// Date limits (today to next 14 days)
+// Date Limits
 const today = new Date()
 const minDate = today.toISOString().split('T')[0]
 const maxLimit = new Date()
@@ -185,33 +199,34 @@ maxLimit.setDate(today.getDate() + 7)
 const maxDate = maxLimit.toISOString().split('T')[0]
 
 function generatePassengers() {
-  passengers.value = []
-  for (let i = 0; i < numMembers.value; i++) {
-    passengers.value.push({
-      name: "",
-      aadhar: "",
-      otp: "",
-      otpSent: false,
-      verified: false,
-      status: "",
-      cooldown: 0,
-      timer: null
-    })
-  }
+  passengers.value = Array.from({ length: numMembers.value }, () => ({
+    name: "",
+    aadhar: "",
+    otp: "",
+    otpSent: false,
+    verified: false,
+    status: "",
+    cooldown: 0,
+    timer: null,
+    age: "",
+    gender: ""
+  }))
 }
 
+// Load Slots
 async function loadPage() {
-  const res = await axios.get(`${BASE}/book-ticket/${userStore.id}`,
-    { params: { type: 'Aarti' } }
-
-  )
+  const res = await axios.get(`${BASE}/book-ticket/${userStore.id}`, {
+    params: { type: 'Aarti' }
+  })
   slots.value = res.data.slots
-  console.log(slots.value)
 }
 
+// Send OTP
 async function sendOtp(index) {
   const p = passengers.value[index]
-  if (!p.aadhar) return alert("Enter Aadhar number")
+  if (!p.aadhar || p.aadhar.length !== 12) {
+    return alert("Enter a valid Aadhar number")
+  }
 
   const res = await axios.post(`${BASE}/send-otp`, { aadhar: p.aadhar })
   p.status = res.data.message
@@ -227,26 +242,48 @@ async function sendOtp(index) {
   }, 1000)
 }
 
+// Verify OTP
 async function verifyOtp(index) {
   const p = passengers.value[index]
-  const res = await axios.post(`${BASE}`/verify-otp, { aadhar: p.aadhar, otp: p.otp })
+  if (!p.otp) return alert("Enter OTP")
+
+  const res = await axios.post(`${BASE}/verify-otp`, {
+    aadhar: p.aadhar,
+    otp: p.otp
+  })
+
   p.verified = res.data.success
   p.status = p.verified ? "Verified ✓" : "OTP Invalid"
 }
 
+// Book Tickets
 async function bookTickets() {
   if (!selectedDate.value) return alert("Please select Aarti date")
   if (!selectedSlot.value) return alert("Please select a slot")
-  if (passengers.value.some(p => !p.verified)) return alert("Verify all OTPs first")
 
-  const res = await axios.post(`${BASE}/book-ticket`, {
+  for (const p of passengers.value) {
+    if (!p.verified) return alert("Verify all OTPs")
+    if (!p.name || !p.age || !p.gender) {
+      return alert("Fill all devotee details")
+    }
+  }
+
+  const payload = {
     user_id: userStore.id,
     slot_id: selectedSlot.value,
     darshan_date: selectedDate.value,
-    mobile_number: booker.value.mobile,
-    passengers: passengers.value
-  })
+    booker_name: booker.value.name,
+    booker_mobile: booker.value.mobile,
+    booker_email: booker.value.email,
+    passengers: passengers.value.map(p => ({
+    name: p.name,
+    aadhar: p.aadhar,
+    age: p.age,
+    gender: p.gender
+    }))
+  }
 
+  const res = await axios.post(`${BASE}/book-ticket`, payload)
   alert(res.data.success ? "Tickets Booked Successfully!" : res.data.message)
 }
 
@@ -254,7 +291,14 @@ onMounted(() => {
   generatePassengers()
   loadPage()
 })
+
+onBeforeUnmount(() => {
+  passengers.value.forEach(p => {
+    if (p.timer) clearInterval(p.timer)
+  })
+})
 </script>
+
 
 <style scoped>
 /* Custom style for the passenger cards for the effect */

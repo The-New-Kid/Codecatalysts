@@ -334,6 +334,8 @@ async function bookTickets() {
   // SEND VALUES AS is_special AND with_special
   const finalPassengers = passengers.value.map(p => ({
     ...p,
+    age: p.age,
+    gender: p.gender,
     is_special: p.speciallyAbled ? true : false,
     with_special: p.accompanying ? true : false
   }))

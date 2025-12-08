@@ -22,24 +22,29 @@ from sqlalchemy import and_
 from datetime import timedelta
 import json
 import cv2
+from werkzeug.security import generate_password_hash, check_password_hash
 from gittest import super
 load_dotenv()
+CURRENT_COUNT_MANDIR=0
+MAX_COUNT_MANDIR=3
+MIN_COUNT_MADIR=1
+FLAG=0
 api=Api(prefix='/api')
 otp_login_storage = {}
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER")
 CONTENT_SID = os.getenv("CONTENT_SID")
-clouflare_url="asd"
+clouflare_url=os.getenv("PUBLIC_BASE_URL")
 TWILIO_CLIENT = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 AADHAR_MOBILE_MAP = {
-    "111122223333": "+917042213383",
-    "222233334444": "+916396081309",
-    "333344445555": "+919900112233",
-    "444455556666": "+919988776655",
-    "555566667777": "+919911223344",
-    "666677778888": "+919922334455",
+    "111122223333": "+917042213383",#shivang
+    "222233334444": "+916396081309",#vansh
+    "333344445555": "+919696733181",#priyanshu
+    "444455556666": "+917456097831",#srashti
+    "555566667777": "+916396526619",#Ayush
+    "666677778888": "+916389890800",#tushar
 }
 
 otp_storage = {}
@@ -183,10 +188,9 @@ class LoginResource(Resource):
         if not user:
             return {"message": "User not found"}, 404
 
-        if user.password != password:
+        if not check_password_hash(user.password, password):
             return {"message": "Incorrect password"}, 401
 
-        # Map 0/1 → "admin"/"user"
         role = "admin" if user.role == 0 else "user"
 
         return {
@@ -195,7 +199,7 @@ class LoginResource(Resource):
             "role": role,
             "name": user.name
         }, 200
-api.add_resource(LoginResource, '/login')
+api.add_resource(LoginResource,'/login')
 
 class RegisterResource(Resource):
     def post(self):
@@ -205,9 +209,11 @@ class RegisterResource(Resource):
         password = data.get('password')
         pincode = data.get('pincode')
         address = data.get('address')
-        mobile_no=data.get('mobile_no')
-        email=email.lower()
-        if not all([name, email, password, pincode, address]):
+        mobile_no = data.get('mobile_no')
+
+        email = email.lower()
+
+        if not all([name, email, password, pincode, address, mobile_no]):
             return {"message": "All fields are required"}, 400
 
         # Check duplicate
@@ -215,17 +221,24 @@ class RegisterResource(Resource):
             return {"message": "Email already registered"}, 409
         if User.query.filter_by(mobile_no=mobile_no).first():
             return {"message": "Mobile number already registered"}, 409
-        # Create user
-        new_user = User(name=name, email=email, password=password,
-                        pincode=pincode, address=address,mobile_no=mobile_no)
+
+        # Encrypt that secret
+        hashed_password = generate_password_hash(password)
+
+        new_user = User(
+            name=name,
+            email=email,
+            password=hashed_password,
+            pincode=pincode,
+            address=address,
+            mobile_no=mobile_no
+        )
+
         db.session.add(new_user)
         db.session.commit()
 
         return {"message": "Registration successful"}, 201
-
-
 api.add_resource(RegisterResource, '/register')
-
 
 class UserDashboardResource(Resource):
     def get(self, user_id):
@@ -383,6 +396,8 @@ class BookTicketResource(Resource):
             otp_entered = p.get("otp")
             is_special=p.get("speciallyAbled",False)
             with_special=p.get("accompanying",False)
+            age=p.get("age")
+            gender=p.get("gender")
             if otp_storage.get(aadhar) != otp_entered:
                 return {"success": False, "message": f"OTP failed for {name}"}, 400
 
@@ -395,7 +410,9 @@ class BookTicketResource(Resource):
                 name=name,
                 special=is_special,
                 with_special=with_special,
-                aadhaar_number=aadhar
+                aadhaar_number=aadhar,
+                age=age,
+                gender=gender
             )
             db.session.add(passenger)
             db.session.flush()
@@ -405,6 +422,9 @@ class BookTicketResource(Resource):
             encoded=qrgenerator(qr_data,qr_filename)
             passenger.qr_code = encoded
             print(qr_filename)
+            slot_type = passenger.slot.slot_type
+            if slot_type=="Darshan":
+                print("hi")
             try:
                 TWILIO_CLIENT.messages.create(
                     from_=TWILIO_WHATSAPP_NUMBER,
@@ -868,53 +888,53 @@ api.add_resource(AdminSpotResource, '/admin/spots/<int:spot_id>')
 api.add_resource(AdminTimeSlotResource, "/admin/time-slots")
 
 
-class FestivalListResource(Resource):
-    def get(self):
-        # Static list abhi ke liye; baad me DB se bhi de sakte hain
-        festivals_list = [
-            {"name": "Lohri", "date": "2025-01-13", "density": "Medium"},
-            {"name": "Makar Sankranti/Pongal", "date": "2025-01-14", "density": "Medium"},
-            {"name": "Vasant Panchami", "date": "2025-02-02", "density": "Medium"},
-            {"name": "Maha Shivratri", "date": "2025-02-26", "density": "Medium"},
-            {"name": "Holika Dahan", "date": "2025-03-13", "density": "High"},
-            {"name": "Holi", "date": "2025-03-14", "density": "High"},
-            {"name": "Hindi New Year", "date": "2025-03-20", "density": "High"},
-            {"name": "Ugadi", "date": "2025-03-30", "density": "High"},
-            {"name": "Ram Navami", "date": "2025-04-06", "density": "Medium"},
-            {"name": "Hanuman Jayanti", "date": "2025-04-12", "density": "Medium"},
-            {"name": "Vaisakhi", "date": "2025-04-14", "density": "Medium"},
-            {"name": "Akshaya Tritiya", "date": "2025-04-30", "density": "Medium"},
-            {"name": "Buddha Purnima", "date": "2025-05-12", "density": "High"},
-            {"name": "Savitri Pooja", "date": "2025-05-26", "density": "Medium"},
-            {"name": "Puri Rath Yatra", "date": "2025-06-27", "density": "Low"},
-            {"name": "Guru Purnima", "date": "2025-07-10", "density": "Medium"},
-            {"name": "Sawan Shivratri", "date": "2025-07-23", "density": "High"},
-            {"name": "Hariyali Teej", "date": "2025-07-27", "density": "Medium"},
-            {"name": "Nag Panchami", "date": "2025-07-29", "density": "Medium"},
-            {"name": "Varalakshmi Vrat", "date": "2025-08-08", "density": "High"},
-            {"name": "Raksha Bandhan", "date": "2025-08-09", "density": "High"},
-            {"name": "Krishna Janmashtami", "date": "2025-08-15", "density": "High"},
-            {"name": "Hartalika Teej", "date": "2025-08-26", "density": "High"},
-            {"name": "Ganesh Chaturthi", "date": "2025-08-27", "density": "High"},
-            {"name": "Onam", "date": "2025-09-05", "density": "Medium"},
-            {"name": "Navaratri Begins", "date": "2025-09-22", "density": "Medium"},
-            {"name": "Navaratri Ends", "date": "2025-10-01", "density": "High"},
-            {"name": "Dussehra", "date": "2025-10-02", "density": "High"},
-            {"name": "Gandhi Jayanti", "date": "2025-10-02", "density": "High"},
-            {"name": "Sharad Purnima", "date": "2025-10-06", "density": "High"},
-            {"name": "Karwa Chauth", "date": "2025-10-10", "density": "High"},
-            {"name": "Dhan Teras", "date": "2025-10-18", "density": "High"},
-            {"name": "Diwali", "date": "2025-10-20", "density": "High"},
-            {"name": "Bhai Dooj", "date": "2025-10-23", "density": "High"},
-            {"name": "Chhath Puja", "date": "2025-10-27", "density": "High"},
-            {"name": "Kartik Poornima", "date": "2025-11-05", "density": "Low"},
-            {"name": "Geeta Jayanti", "date": "2025-12-01", "density": "Low"},
-            {"name": "Dhanu Sankranti", "date": "2025-12-16", "density": "Low"},
-            {"name": "Christmas", "date": "2025-12-25", "density": "Low"}
-        ]
-        return {"festivals": festivals_list}, 200
-api.add_resource(FestivalListResource, '/festivals')
-#added
+# class FestivalListResource(Resource):
+#     def get(self):
+#         # Static list abhi ke liye; baad me DB se bhi de sakte hain
+#         festivals_list = [
+#             {"name": "Lohri", "date": "2025-01-13", "density": "Medium"},
+#             {"name": "Makar Sankranti/Pongal", "date": "2025-01-14", "density": "Medium"},
+#             {"name": "Vasant Panchami", "date": "2025-02-02", "density": "Medium"},
+#             {"name": "Maha Shivratri", "date": "2025-02-26", "density": "Medium"},
+#             {"name": "Holika Dahan", "date": "2025-03-13", "density": "High"},
+#             {"name": "Holi", "date": "2025-03-14", "density": "High"},
+#             {"name": "Hindi New Year", "date": "2025-03-20", "density": "High"},
+#             {"name": "Ugadi", "date": "2025-03-30", "density": "High"},
+#             {"name": "Ram Navami", "date": "2025-04-06", "density": "Medium"},
+#             {"name": "Hanuman Jayanti", "date": "2025-04-12", "density": "Medium"},
+#             {"name": "Vaisakhi", "date": "2025-04-14", "density": "Medium"},
+#             {"name": "Akshaya Tritiya", "date": "2025-04-30", "density": "Medium"},
+#             {"name": "Buddha Purnima", "date": "2025-05-12", "density": "High"},
+#             {"name": "Savitri Pooja", "date": "2025-05-26", "density": "Medium"},
+#             {"name": "Puri Rath Yatra", "date": "2025-06-27", "density": "Low"},
+#             {"name": "Guru Purnima", "date": "2025-07-10", "density": "Medium"},
+#             {"name": "Sawan Shivratri", "date": "2025-07-23", "density": "High"},
+#             {"name": "Hariyali Teej", "date": "2025-07-27", "density": "Medium"},
+#             {"name": "Nag Panchami", "date": "2025-07-29", "density": "Medium"},
+#             {"name": "Varalakshmi Vrat", "date": "2025-08-08", "density": "High"},
+#             {"name": "Raksha Bandhan", "date": "2025-08-09", "density": "High"},
+#             {"name": "Krishna Janmashtami", "date": "2025-08-15", "density": "High"},
+#             {"name": "Hartalika Teej", "date": "2025-08-26", "density": "High"},
+#             {"name": "Ganesh Chaturthi", "date": "2025-08-27", "density": "High"},
+#             {"name": "Onam", "date": "2025-09-05", "density": "Medium"},
+#             {"name": "Navaratri Begins", "date": "2025-09-22", "density": "Medium"},
+#             {"name": "Navaratri Ends", "date": "2025-10-01", "density": "High"},
+#             {"name": "Dussehra", "date": "2025-10-02", "density": "High"},
+#             {"name": "Gandhi Jayanti", "date": "2025-10-02", "density": "High"},
+#             {"name": "Sharad Purnima", "date": "2025-10-06", "density": "High"},
+#             {"name": "Karwa Chauth", "date": "2025-10-10", "density": "High"},
+#             {"name": "Dhan Teras", "date": "2025-10-18", "density": "High"},
+#             {"name": "Diwali", "date": "2025-10-20", "density": "High"},
+#             {"name": "Bhai Dooj", "date": "2025-10-23", "density": "High"},
+#             {"name": "Chhath Puja", "date": "2025-10-27", "density": "High"},
+#             {"name": "Kartik Poornima", "date": "2025-11-05", "density": "Low"},
+#             {"name": "Geeta Jayanti", "date": "2025-12-01", "density": "Low"},
+#             {"name": "Dhanu Sankranti", "date": "2025-12-16", "density": "Low"},
+#             {"name": "Christmas", "date": "2025-12-25", "density": "Low"}
+#         ]
+#         return {"festivals": festivals_list}, 200
+# api.add_resource(FestivalListResource, '/festivals')
+# #added
 class AdminPrivateParkingLotsResource(Resource):
     def get(self):
         """Return private lots + spot occupancy for selected date & timeslot."""
@@ -1028,24 +1048,6 @@ class ScanTicketImageResource(Resource):
                     "success": False,
                     "message": "❌ Could not read QR code."
                 }, 400
-            # # Open and decode
-            # img = Image.open(filepath)
-            # print(type(img))
-            # decoded_objs = decode(img)
-            # print(decoded_objs)
-            # print(type(decoded_objs[0]))
-            # if decoded_objs:
-            #     qr_data = decoded_objs[0].data
-            #     decoded = Base64.b64decode(qr_data).decode("utf-8")
-            #     print(decoded)
-            #     print(type(decoded))
-            # else:
-            #     return {
-            #         "success": False,
-            #         "message": "❌ Could not read QR code from uploaded file."
-            #     }, 400
-
-            # Interpret QR content as ticket_id
             try:
                 data = ast.literal_eval(decoded)
                 passenger_id=data['passenger_id']
@@ -1064,17 +1066,29 @@ class ScanTicketImageResource(Resource):
                     "success": False,
                     "message": "❌ Ticket not found."
                 }, 404
-
+            global CURRENT_COUNT_MANDIR
+            global MAX_COUNT_MANDIR
+            global MIN_COUNT_MADIR
+            global FLAG
             # Same logic as your original route
-            if ticket.scan_count == 0:
+            if MAX_COUNT_MANDIR==CURRENT_COUNT_MANDIR:
+                FLAG=1
+            if MIN_COUNT_MADIR==CURRENT_COUNT_MANDIR:
+                FLAG=0
+            if ticket.scan_count == 0 and FLAG==0:
                 ticket.scan_count = 1
+                CURRENT_COUNT_MANDIR=CURRENT_COUNT_MANDIR+1
+                print(CURRENT_COUNT_MANDIR)
                 message = f"✅ Entry granted for Ticket {ticket.id}"
             elif ticket.scan_count == 1:
                 ticket.scan_count = 2
+                CURRENT_COUNT_MANDIR=CURRENT_COUNT_MANDIR-1
+                print(CURRENT_COUNT_MANDIR)
                 message = f"✅ Exit recorded for Ticket {ticket.id}"
-            else:
+            elif ticket.scan_count==2:
                 message = f"❌ Ticket {ticket.id} already expired."
-
+            else:
+                message=f"Mandir is currently full,please wait for sometime"
             db.session.commit()
 
             return {
@@ -1143,15 +1157,29 @@ class ScanTicketLiveResource(Resource):
                 return {"success": False, "message": "❌ Ticket not found."}, 404
 
             # Same logic as static scan
-            if ticket.scan_count == 0:
+            global CURRENT_COUNT_MANDIR
+            global MAX_COUNT_MANDIR
+            global MIN_COUNT_MADIR
+            global FLAG
+            # Same logic as your original route
+            if MAX_COUNT_MANDIR==CURRENT_COUNT_MANDIR:
+                FLAG=1
+            if MIN_COUNT_MADIR==CURRENT_COUNT_MANDIR:
+                FLAG=0
+            if ticket.scan_count == 0 and FLAG==0:
                 ticket.scan_count = 1
+                CURRENT_COUNT_MANDIR=CURRENT_COUNT_MANDIR+1
+                print(CURRENT_COUNT_MANDIR)
                 message = f"✅ Entry granted for Ticket {ticket.id}"
             elif ticket.scan_count == 1:
                 ticket.scan_count = 2
+                CURRENT_COUNT_MANDIR=CURRENT_COUNT_MANDIR-1
+                print(CURRENT_COUNT_MANDIR)
                 message = f"✅ Exit recorded for Ticket {ticket.id}"
-            else:
+            elif ticket.scan_count==2:
                 message = f"❌ Ticket {ticket.id} already expired."
-
+            else:
+                message=f"Mandir is currently full,please wait for sometime"
             db.session.commit()
 
             return {

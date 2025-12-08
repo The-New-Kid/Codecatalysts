@@ -1,11 +1,14 @@
 from models.model import db, User,ParkingLot,ParkingSpot,Aarti_and_DarshanSlot,PanchangCache,ParkingTimeSlot
 import datetime
 from datetime import timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
 # Create initial users
-user1 = User(name="Priyanshu Singh", email="priyanshu@email.com", role=0, password="priyanshu123", pincode="226010", address="Khargapur Gomti nagar Lucknow", mobile_no="1234567890")
-user2 = User(name="Shivang Agarwal", email="shivang@email.com", role=1, password="shivang123", pincode="223010", address="Noida-201034", mobile_no="7042213383")
+user1 = User(name="Priyanshu Singh", email="priyanshu@email.com", role=0, password=generate_password_hash("priyanshu123"), pincode="226010", address="Khargapur Gomti nagar Lucknow", mobile_no="1234567890")
+user2 = User(name="Shivang Agarwal", email="shivang@email.com", role=1, password=generate_password_hash("shivang123"), pincode="223010", address="Noida-201034", mobile_no="7042213383")
+user3=User(name="Tushar Patel",email="tusharpat0701@gmail.com",role=2,password=generate_password_hash("Tushar123"),pincode="201310",address="AB hostel",mobile_no="6389890800")
 db.session.add(user1)
 db.session.add(user2)
+db.session.add(user3)
 db.session.commit()
 
 
