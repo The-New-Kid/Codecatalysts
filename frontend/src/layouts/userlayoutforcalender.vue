@@ -1,25 +1,46 @@
 <template>
-  <div class="flex flex-col min-h-screen bg-[#fffbf2] font-sans">
+  <div class="flex flex-col min-h-screen bg-[#fffbf2] font-sans overflow-x-hidden">
 
     <!-- ✅ HEADER -->
     <header class="fixed top-0 w-full z-50 bg-gradient-to-r from-orange-600 via-red-700 to-red-800 shadow-lg text-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-20">
+        <div class="flex justify-between items-center h-20 min-w-0">
 
-          <!-- ✅ LOGO -->
-          <div class="flex items-center gap-3">
-            <div class="bg-white/10 p-2 rounded-full border border-yellow-400/50 backdrop-blur-sm">
+          <!-- ✅ BACK BUTTON + LOGO -->
+          <div class="flex items-center gap-3 min-w-0">
+
+            <!-- ✅ BACK BUTTON -->
+            <button 
+              v-if="showBackButton"
+              @click="goBack"
+              class="flex items-center justify-center w-9 h-9 rounded-full bg-white/10 border border-yellow-400/50 hover:bg-white/20 transition md:hidden"
+              aria-label="Go Back"
+            >
+
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-100" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  stroke-width="2" d="M15 19l-7-7 7-7"/>
+              </svg>
+            </button>
+
+            <!-- ✅ TEMPLE LOGO -->
+            <div class="bg-white/10 p-2 rounded-full border border-yellow-400/50 backdrop-blur-sm flex-shrink-0">
               <span class="text-3xl">🛕</span>
             </div>
-            <div class="flex flex-col">
-              <h1 class="text-xl font-bold font-serif tracking-wide text-yellow-50">
+
+            <!-- ✅ DEV DHAMPATH TEXT -->
+            <div class="flex flex-col min-w-0">
+              <h1 class="text-xl font-bold font-serif tracking-wide text-yellow-50 truncate">
                 DevDhamPath
               </h1>
               <span class="text-xs text-yellow-200 uppercase tracking-widest">
                 Darshan & Seva
               </span>
             </div>
+
           </div>
+
 
           <!-- ✅ DESKTOP NAV -->
           <nav class="hidden md:flex space-x-8">
@@ -44,7 +65,7 @@
           </div>
 
           <!-- ✅ MOBILE MENU BUTTON -->
-          <button class="md:hidden" @click="mobileOpen = !mobileOpen">
+          <button class="md:hidden flex-shrink-0 ml-2" @click="mobileOpen = !mobileOpen">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none"
               viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round"
@@ -104,15 +125,25 @@
   </div>
 </template>
 
-
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted,computed } from 'vue'
 import feather from 'feather-icons'
 import { useUserStore } from '@/stores/user'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 const user = useUserStore()
 const router = useRouter()
+const route = useRoute()
+
+function goBack() {
+  router.back()
+}
+
+const showBackButton = computed(() => {
+  return route.path !== '/user/dashboard'
+})
+
+
 const mobileOpen = ref(false)
 
 onMounted(() => {

@@ -18,8 +18,8 @@ def create_app():
     CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
     db.init_app(app)
 
-    # Register controllers
-    api.init_app(app)
+    # Register controllers / blueprints
+    api.init_app(app)          # your existing routes
 
     @app.route("/api/hello")
     def hello():
@@ -31,9 +31,7 @@ def create_app():
 # Create the Flask application
 app = create_app()
 
-# 🔥 Add CORS headers for OPTIONS preflight requests
-
-# Create database if it doesn't exist
+# Create database if it doesn't exist (for your other models)
 db_path = os.path.join("instance", "DevDhamPath.sqlite3")
 if not os.path.exists(db_path):
     with app.app_context():
