@@ -104,6 +104,10 @@ class Passenger(db.Model):
     slot_id = db.Column(db.Integer, db.ForeignKey('darshan_slots.id', ondelete='CASCADE'), nullable=False)
     special=db.Column(db.Boolean, default=False)
     with_special=db.Column(db.Boolean, default=False)
+    age=db.Column(db.Integer,nullable=False)
+    gender=db.Column(db.String(10),nullable=False)
+    priority=db.Column(db.Integer,default=0)
+    wheelchairneeded=db.Column(db.Boolean,default=False)
 
 
 class SevaBooking(db.Model):

@@ -129,6 +129,10 @@
           <p class="text-sm mt-3 font-medium" :class="p.verified ? 'text-green-700' : 'text-red-700'">
             {{ p.status }}
           </p>
+            <label class="flex items-center gap-2 text-purple-700 font-medium cursor-pointer">
+            <input type="checkbox" v-model="p.wheelchairNeeded" />
+            🦽 Wheelchair Needed
+          </label>
         </div>
 
         <hr class="my-8 sm:my-10 border-red-100" />
@@ -209,6 +213,9 @@ function generatePassengers() {
     cooldown: 0,
     timer: null,
     age: "",
+    gender: "",
+    wheelchairNeeded: false,
+    age: "",
     gender: ""
   }))
 }
@@ -279,7 +286,8 @@ async function bookTickets() {
     name: p.name,
     aadhar: p.aadhar,
     age: p.age,
-    gender: p.gender
+    gender: p.gender,
+    wheelchair_needed: p.wheelchairNeeded 
     }))
   }
 

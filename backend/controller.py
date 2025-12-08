@@ -169,11 +169,7 @@ class LoginverifyotpResource(Resource):
             "role": role,
             "name": user.name
         }, 200
-api.add_resource(MobileLoginResource, '/mobile-login')
-api.add_resource(LoginverifyotpResource, '/login-verify-otp')
-api.add_resource(ImageserverResource,'/qrcode/<string:filename>')
-api.add_resource(VerifyOtpResource, '/verify-otp')
-api.add_resource(SendOtpResource, '/send-otp')
+
 
 class LoginResource(Resource):
     def post(self):
@@ -353,8 +349,8 @@ class BookTicketResource(Resource):
         user_id = data.get("user_id")
         slot_id = data.get("slot_id")
         darshan_date = data.get("darshan_date")
-        passengers = data.get("passengers")
-        mobile_number = data.get("mobile_number")
+        passengers = data.get("passengers", [])
+        mobile_number = data.get("booker_mobile") or data.get("mobile_number")
 
         if not darshan_date:
             return {"success": False, "message": "Darshan date missing"}, 400
@@ -372,36 +368,74 @@ class BookTicketResource(Resource):
 
         num_members = len(passengers)
 
-        already_booked = db.session.query(Passenger)\
-            .filter(
-                Passenger.slot_id == slot_id,
-                Passenger.darshan_date == selected_date
-            ).count()
+        already_booked = Passenger.query.filter_by(
+            slot_id=slot_id,
+            darshan_date=selected_date
+        ).count()
 
         if already_booked + num_members > slot.max_visitors:
             return {
                 "success": False,
                 "message": f"Only {slot.max_visitors - already_booked} slots left"
             }, 400
-        
 
+        # QR Setup
         QR_FOLDER = os.path.join("static", "qrcode")
         os.makedirs(QR_FOLDER, exist_ok=True)
 
         booked_passengers = []
+        special_priority_map = []
 
+        # 1st PASS: assign priority for special passengers
         for p in passengers:
+            if not p.get("is_special"):
+                special_priority_map.append(None)
+                continue
+
+            age = int(p.get("age", 0))
+            wheelchair_needed = p.get("wheelchair_needed", False)
+
+            # Base priority rules
+            priority = 0
+            if 60 <= age < 70:
+                priority += 1
+            elif age >= 70:
+                priority += 2
+            if wheelchair_needed:
+                priority += 4
+
+            special_priority_map.append(priority)
+
+        # Extract priorities of only specials in original order
+        special_priorities = [pr for pr in special_priority_map if pr is not None]
+        special_index = 0
+
+        # 2nd PASS: save passengers and assign priority
+        for idx, p in enumerate(passengers):
             name = p.get("name")
             aadhar = p.get("aadhar")
-            otp_entered = p.get("otp")
-            is_special=p.get("speciallyAbled",False)
-            with_special=p.get("accompanying",False)
-            age=p.get("age")
-            gender=p.get("gender")
+            otp_entered = p.get("otp", None)
+
             if otp_storage.get(aadhar) != otp_entered:
                 return {"success": False, "message": f"OTP failed for {name}"}, 400
-
             otp_storage.pop(aadhar, None)
+
+            age = int(p.get("age", 0))
+            gender = p.get("gender", "")
+
+            is_special = p.get("is_special", False)
+            with_special = p.get("with_special", False)
+            wheelchair_needed = p.get("wheelchair_needed", False)
+
+            if is_special:
+                priority = special_priorities[special_index]
+                special_index += 1
+            else:
+                # Assign accompanying priority = special counterpart
+                if with_special and special_priorities:
+                    priority = special_priorities[0]  # Link to first special
+                else:
+                    priority = 0
 
             passenger = Passenger(
                 user_id=user.id,
@@ -412,30 +446,33 @@ class BookTicketResource(Resource):
                 with_special=with_special,
                 aadhaar_number=aadhar,
                 age=age,
-                gender=gender
+                gender=gender,
+                priority=priority,
+                wheelchairneeded=wheelchair_needed
             )
             db.session.add(passenger)
             db.session.flush()
 
-            qr_data = str({"name":name,"passenger_id":passenger.id, "darshan_date":darshan_date, "slot_id":slot_id,"adhaar":aadhar,"special":is_special,"with_special":with_special})
+            qr_data = str({
+                "name": name,
+                "passenger_id": passenger.id,
+                "darshan_date": darshan_date,
+                "slot_id": slot_id,
+                "aadhar": aadhar,
+                "special": is_special,
+                "with_special": with_special,
+                "priority": priority
+            })
             qr_filename = f"passenger_{passenger.id}_{secure_filename(name)}.png"
-            encoded=qrgenerator(qr_data,qr_filename)
+            encoded = qrgenerator(qr_data, qr_filename)
             passenger.qr_code = encoded
-            print(qr_filename)
+
             slot_type = passenger.slot.slot_type
-            if slot_type=="Darshan":
-                print("hi")
             try:
                 TWILIO_CLIENT.messages.create(
                     from_=TWILIO_WHATSAPP_NUMBER,
-                    body=f"Ticket #{passenger.id} booked for {name} at {slot.start_time.strftime('%Y-%m-%d %H:%M')}",
-                    to=f"whatsapp:+91{mobile_number}"
-                )
-                
-                TWILIO_CLIENT.messages.create(
-                    from_=TWILIO_WHATSAPP_NUMBER,
-                    body=f"Ticket #{passenger.id} booked for {name} at {slot.start_time.strftime('%Y-%m-%d %H:%M')}",
-                    media_url=[f"{clouflare_url}/api/qrcode/{qr_filename}"],         ##Cloudflareee
+                    body=f"{slot_type} Ticket #{passenger.id} booked for {name}",
+                    media_url=[f"{clouflare_url}/api/qrcode/{qr_filename}"],
                     to=f"whatsapp:+91{mobile_number}"
                 )
             except Exception as e:
@@ -448,10 +485,7 @@ class BookTicketResource(Resource):
 
         db.session.commit()
 
-        return {
-            "success": True,
-            "passengers": booked_passengers
-        }, 200
+        return {"success": True, "passengers": booked_passengers}, 200
 
 api.add_resource(BookTicketResource, '/book-ticket')
 # -------------------------------------------
@@ -1586,3 +1620,8 @@ class SlotAvailabilityResource(Resource):
 
 
 api.add_resource(SlotAvailabilityResource, "/slots")
+api.add_resource(MobileLoginResource, '/mobile-login')
+api.add_resource(LoginverifyotpResource, '/login-verify-otp')
+api.add_resource(ImageserverResource,'/qrcode/<string:filename>')
+api.add_resource(VerifyOtpResource, '/verify-otp')
+api.add_resource(SendOtpResource, "/send-otp")

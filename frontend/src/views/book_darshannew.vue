@@ -57,7 +57,8 @@
               Email
             </label>
             <input
-              v-model="booker.email" type="email"
+              v-model="booker.email"
+              type="email"
               class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition shadow-sm"
             />
           </div>
@@ -74,7 +75,9 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div>
-              <label class="block font-semibold mb-1 text-gray-700">Select Darshan Date</label>
+              <label class="block font-semibold mb-1 text-gray-700">
+                Select Darshan Date
+              </label>
               <input
                 type="date"
                 v-model="selectedDate"
@@ -85,7 +88,9 @@
             </div>
 
             <div>
-              <label class="block font-semibold mb-1 text-gray-700">Number of Tickets</label>
+              <label class="block font-semibold mb-1 text-gray-700">
+                Total Number of Tickets
+              </label>
               <input
                 type="number"
                 min="1"
@@ -93,6 +98,29 @@
                 @input="generatePassengers"
                 class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition shadow-sm"
               />
+            </div>
+          </div>
+
+          <!-- ✅ SPECIAL DEVOTEES COUNT -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div>
+              <label class="block font-semibold mb-1 text-gray-700">
+                Number of Specially-Abled Devotees
+                <span class="text-xs text-gray-500">(≤ Total Tickets)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                :max="numMembers"
+                v-model.number="numSpecial"
+                @input="onSpecialCountChange"
+                class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition shadow-sm"
+              />
+            </div>
+
+            <div class="flex flex-col justify-center text-sm sm:text-base text-gray-700">
+              <span>♿ Specially-Abled: {{ countSpeciallyAbled }}</span>
+              <span>👥 Accompanying Allowed: {{ countSpeciallyAbled }}</span>
             </div>
           </div>
         </div>
@@ -111,7 +139,15 @@
         >
 
           <h4 class="font-bold text-red-700 mb-3 text-base sm:text-lg flex items-center">
-            <span class="mr-2">👤</span> Passenger {{ i + 1 }}
+            <span class="mr-2" v-if="p.speciallyAbled">♿</span>
+            <span class="mr-2" v-else>👤</span>
+
+            <span v-if="p.speciallyAbled">
+              Specially Abled Devotee {{ getSpecialIndex(i) }}
+            </span>
+            <span v-else>
+              Passenger {{ getNormalIndex(i) }}
+            </span>
           </h4>
 
           <input
@@ -139,11 +175,17 @@
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-            <input v-model="p.age" type="number" placeholder="Age"
-              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl" />
+            <input
+              v-model="p.age"
+              type="number"
+              placeholder="Age"
+              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl"
+            />
 
-            <select v-model="p.gender"
-              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl bg-white">
+            <select
+              v-model="p.gender"
+              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl bg-white"
+            >
               <option value="">Select Gender</option>
               <option>Male</option>
               <option>Female</option>
@@ -152,25 +194,37 @@
           </div>
 
           <div class="flex flex-col sm:flex-row gap-3 mb-4">
-            <label class="flex items-center gap-2 text-red-700 font-medium cursor-pointer">
-              <input type="checkbox" v-model="p.speciallyAbled" @change="onSpeciallyAbled(i)" />
-              ♿ Specially Abled
-            </label>
+            <!-- Info badge instead of checkbox for special flag -->
+            <div class="flex items-center gap-2 text-red-700 font-medium">
+              <span v-if="p.speciallyAbled">♿ Specially Abled Devotee</span>
+              <span v-else>👤 Normal Passenger</span>
+            </div>
 
             <label class="flex items-center gap-2 text-blue-700 font-medium cursor-pointer">
               <input
                 type="checkbox"
                 v-model="p.accompanying"
                 @change="onAccompanying(i)"
-                :disabled="!p.speciallyAbled && !canSelectAccompanying(i)"
+                :disabled="p.speciallyAbled || !canSelectAccompanying(i)"
               />
               👥 Accompanying
+            </label>
+
+            <label class="flex items-center gap-2 text-purple-700 font-medium cursor-pointer">
+              <input
+                type="checkbox"
+                v-model="p.wheelchairNeeded"
+              />
+              🦽 Wheelchair Needed
             </label>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input v-model="p.otp" placeholder="Enter OTP"
-              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl" />
+            <input
+              v-model="p.otp"
+              placeholder="Enter OTP"
+              class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl"
+            />
 
             <button
               @click="verifyOtp(i)"
@@ -187,8 +241,10 @@
           <label class="block font-serif font-bold mb-2 text-red-800 text-lg sm:text-xl">
             Select Darshan Slot
           </label>
-          <select v-model="selectedSlot"
-            class="w-full p-3 border-2 border-gray-300 rounded-xl bg-white">
+          <select
+            v-model="selectedSlot"
+            class="w-full p-3 border-2 border-gray-300 rounded-xl bg-white"
+          >
             <option value="">-- Select Slot --</option>
             <option v-for="s in slots" :key="s.id" :value="s.id">
               {{ s.slot_type }} | {{ s.start }} - {{ s.end }}
@@ -211,9 +267,6 @@
   </div>
 </template>
 
-
-
-
 <script setup>
 import { ref, onMounted, computed } from "vue"
 import axios from "axios"
@@ -227,47 +280,63 @@ const BASE = import.meta.env.VITE_API_URL
 const userStore = useUserStore()
 
 const booker = ref({ name: userStore.name, email: "", mobile: "" })
+
 const numMembers = ref(1)
+const numSpecial = ref(0)
+
 const passengers = ref([])
 const slots = ref([])
 const selectedSlot = ref("")
 const selectedDate = ref("")
 
 const today = new Date()
-today.setDate(today.getDate() +1)
-const minDate = today.toISOString().split('T')[0]
+today.setDate(today.getDate() + 1)
+const minDate = today.toISOString().split("T")[0]
 const maxLimit = new Date()
 maxLimit.setDate(today.getDate() + 6)
-const maxDate = maxLimit.toISOString().split('T')[0]
+const maxDate = maxLimit.toISOString().split("T")[0]
 
 function generatePassengers() {
+  // Basic safety on counts
+  if (numMembers.value < 1) numMembers.value = 1
+  if (numSpecial.value < 0) numSpecial.value = 0
+  if (numSpecial.value > numMembers.value) numSpecial.value = numMembers.value
+
+  const oldPassengers = passengers.value
   passengers.value = []
+
   for (let i = 0; i < numMembers.value; i++) {
+    const old = oldPassengers[i] || {}
+
     passengers.value.push({
-      name: "",
-      aadhar: "",
+      name: old.name || "",
+      aadhar: old.aadhar || "",
       otp: "",
       otpSent: false,
-      verified: false,
+      verified: old.verified || false,
       status: "",
       cooldown: 0,
       timer: null,
-
-      // checkboxes
-      speciallyAbled: false,
+      // first numSpecial are specially abled
+      speciallyAbled: i < numSpecial.value,
       accompanying: false,
-
-      // ✅ new fields
-      age: "",
-      gender: ""
+      age: old.age || "",
+      gender: old.gender || "",
+      wheelchairNeeded: old.wheelchairNeeded || false,
     })
   }
 }
 
+function onSpecialCountChange() {
+  if (numSpecial.value < 0) numSpecial.value = 0
+  if (numSpecial.value > numMembers.value) numSpecial.value = numMembers.value
+  generatePassengers()
+}
+
 async function loadPage() {
-  const res = await axios.get(`${BASE}/book-ticket/${userStore.id}`,
-    { params: { type: 'Darshan' } }
-  )
+  const res = await axios.get(`${BASE}/book-ticket/${userStore.id}`, {
+    params: { type: 'Darshan' }
+  })
   slots.value = res.data.slots
 }
 
@@ -276,10 +345,15 @@ async function loadPage() {
 async function sendOtp(i) {
   const p = passengers.value[i]
   if (!p.aadhar) return alert("Enter Aadhar number")
+
   const res = await axios.post(`${BASE}/send-otp`, { aadhar: p.aadhar })
   p.status = res.data.message
   p.otpSent = true
   p.cooldown = 60
+
+  if (p.timer) {
+    clearInterval(p.timer)
+  }
 
   p.timer = setInterval(() => {
     p.cooldown--
@@ -299,29 +373,65 @@ async function verifyOtp(i) {
 
 /* ---------------- ACCOMPANYING RULE ---------------- */
 
+const countSpeciallyAbled = computed(() =>
+  passengers.value.filter(p => p.speciallyAbled).length
+)
+
+const countAccompanying = computed(() =>
+  passengers.value.filter(p => p.accompanying).length
+)
+
 function canSelectAccompanying(index) {
-  return passengers.value.every((p, i) => i === index || !p.accompanying)
+  const specialCount = countSpeciallyAbled.value
+  if (specialCount === 0) return false
+
+  const currentAccompanying = passengers.value.filter(p => p.accompanying).length
+  const p = passengers.value[index]
+
+  // If trying to turn ON accompanying and already at limit, block
+  if (!p.accompanying && currentAccompanying >= specialCount) {
+    return false
+  }
+  return true
 }
 
 function onAccompanying(index) {
   const p = passengers.value[index]
-  if (p.accompanying && !canSelectAccompanying(index)) {
-    alert("Only one passenger can be marked as Accompanying.")
+
+  // Only normal passengers can be accompanying
+  if (p.speciallyAbled) {
     p.accompanying = false
+    return
+  }
+
+  // If user just turned it ON, enforce max = #special
+  if (p.accompanying) {
+    const specialCount = countSpeciallyAbled.value
+    const currentAccompanying = passengers.value.filter(pp => pp.accompanying).length
+    if (currentAccompanying > specialCount) {
+      alert("Accompanying passengers cannot be more than specially-abled devotees.")
+      p.accompanying = false
+    }
   }
 }
 
-function onSpeciallyAbled(index) {
-  const p = passengers.value[index]
+/* ---------------- LABEL HELPERS ---------------- */
 
-  // If unchecked special, also uncheck accompanying
-  if (!p.speciallyAbled) p.accompanying = false
+function getSpecialIndex(index) {
+  let count = 0
+  for (let i = 0; i <= index; i++) {
+    if (passengers.value[i].speciallyAbled) count++
+  }
+  return count
 }
 
-/* ---------------- COMPUTED SUMMARY ---------------- */
-
-const countSpeciallyAbled = computed(() => passengers.value.filter(p => p.speciallyAbled).length)
-const countAccompanying = computed(() => passengers.value.filter(p => p.accompanying).length)
+function getNormalIndex(index) {
+  let count = 0
+  for (let i = 0; i <= index; i++) {
+    if (!passengers.value[i].speciallyAbled) count++
+  }
+  return count
+}
 
 /* ---------------- BOOKING ---------------- */
 
@@ -329,18 +439,21 @@ async function bookTickets() {
   if (!selectedDate.value) return alert("Please select Darshan date")
   if (!selectedSlot.value) return alert("Please select a slot")
   if (passengers.value.some(p => !p.verified)) return alert("Verify all OTPs first")
-  if (countAccompanying.value > 1) return alert("Only one passenger can be Accompanying")
 
-  // SEND VALUES AS is_special AND with_special
+  if (countAccompanying.value > countSpeciallyAbled.value) {
+    return alert("Accompanying passengers cannot be more than specially-abled devotees.")
+  }
+
   const finalPassengers = passengers.value.map(p => ({
     ...p,
     age: p.age,
     gender: p.gender,
     is_special: p.speciallyAbled ? true : false,
-    with_special: p.accompanying ? true : false
+    with_special: p.accompanying ? true : false,
+    wheelchair_needed: p.wheelchairNeeded ? true : false,
   }))
 
-  const res = await axios.post(`${BASE}/book-ticket`, {
+  const res = await axios.post(`${BASE}/api/book-ticket`, {
     user_id: userStore.id,
     slot_id: selectedSlot.value,
     darshan_date: selectedDate.value,
