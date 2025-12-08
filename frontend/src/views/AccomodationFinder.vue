@@ -1,5 +1,5 @@
 <template>
-  <Userlayoutnew>
+  <div>
     <div class="w-full min-h-screen bg-orange-50">
       
       <!-- Header -->
@@ -102,12 +102,11 @@
       </div>
 
     </div>
-  </Userlayoutnew>
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import Userlayoutnew from '@/layouts/Userlayoutnew.vue'
 
 const map = ref(null)
 const mapEl = ref(null)

@@ -6,7 +6,7 @@ import mimetypes
 import os
 import requests
 import calendar
-from pyzbar.pyzbar import decode
+#from pyzbar.pyzbar import decode
 from PIL import Image
 import base64 as Base64
 import time
@@ -22,6 +22,7 @@ from sqlalchemy import and_
 from datetime import timedelta
 import json
 import cv2
+from gittest import super
 load_dotenv()
 api=Api(prefix='/api')
 otp_login_storage = {}
@@ -205,7 +206,7 @@ class RegisterResource(Resource):
         pincode = data.get('pincode')
         address = data.get('address')
         mobile_no=data.get('mobile_no')
-
+        email=email.lower()
         if not all([name, email, password, pincode, address]):
             return {"message": "All fields are required"}, 400
 
@@ -437,28 +438,96 @@ api.add_resource(BookTicketResource, '/book-ticket')
 API_USER = os.getenv("CALANDER_UID")
 API_KEY = os.getenv("CALANDER_API_KEY")
 
+# class PanchangMonthResource(Resource):
+#     def post(self):
+#         data = request.get_json()
+#         month = data["month"]
+#         year = data["year"]
+#         list_hindu=super(year=year,month=month)
+#         total_days = calendar.monthrange(year, month)[1]
+
+#         result = {}
+
+#         for day in range(1, total_days + 1):
+
+#             # 1. Check cache
+#             cached = PanchangCache.query.filter_by(
+#                 day=day, month=month, year=year
+#             ).first()
+
+#             if cached:
+#                 result[day] = cached.tithi
+#                 continue
+
+#             # 2. Call Astrology API if not cached
+#             payload = {
+#                 "day": day,
+#                 "month": month,
+#                 "year": year,
+#                 "hour": 7,
+#                 "min": 45,
+#                 "lat": 19.132,
+#                 "lon": 72.342,
+#                 "tzone": 5.5
+#             }
+
+#             response = requests.post(
+#                 "https://json.astrologyapi.com/v1/basic_panchang",
+#                 json=payload,
+#                 auth=(API_USER, API_KEY)
+#             )
+
+#             tithi = response.json().get("tithi")
+
+#             # 3. Save in DB
+#             new_entry = PanchangCache(
+#                 day=day,
+#                 month=month,
+#                 year=year,
+#                 tithi=tithi
+#             )
+#             db.session.add(new_entry)
+#             db.session.commit()
+
+#             result[day] = tithi
+
+#         return result, 200
 class PanchangMonthResource(Resource):
     def post(self):
         data = request.get_json()
         month = data["month"]
         year = data["year"]
+        print(type(month),type(year))
+        list_hindu = super(year=str(year), month=month) or []    
+        print(list_hindu)
+        # Convert festival list into dictionary: {day: fest_name}
+        festival_map = {}
+        for item in list_hindu:
+            try:
+                d = int(item.get("date"))
+                n = item.get("name")
+                if d and n:
+                    festival_map[d] = n
+            except:
+                pass
 
         total_days = calendar.monthrange(year, month)[1]
-
+        print("fest:",festival_map)
         result = {}
 
         for day in range(1, total_days + 1):
-
-            # 1. Check cache
+            fest = festival_map.get(day)
             cached = PanchangCache.query.filter_by(
                 day=day, month=month, year=year
             ).first()
 
             if cached:
-                result[day] = cached.tithi
+                result[day] = {
+                    "tithi": cached.tithi,
+                    "fest":fest
+                }
                 continue
 
-            # 2. Call Astrology API if not cached
             payload = {
                 "day": day,
                 "month": month,
@@ -475,21 +544,24 @@ class PanchangMonthResource(Resource):
                 json=payload,
                 auth=(API_USER, API_KEY)
             )
-
+            
             tithi = response.json().get("tithi")
+              # check if this day has a festival
 
-            # 3. Save in DB
             new_entry = PanchangCache(
                 day=day,
                 month=month,
                 year=year,
-                tithi=tithi
+                tithi=tithi,
+                fest=fest
             )
             db.session.add(new_entry)
             db.session.commit()
 
-            result[day] = tithi
-
+            result[day] = {
+                "tithi": tithi,
+                "fest": fest
+            }
         return result, 200
 
 

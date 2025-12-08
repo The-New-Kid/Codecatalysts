@@ -88,19 +88,25 @@ const userStore = useUserStore()
 
 async function handleLogin() {
   try {
-    const response = await axios.post('http://192.168.29.154:5000/api/login', {
-      email: email.value,
+    const response = await axios.post(`${import.meta.env.VITE_API_URL}/login`, {
+      email: email.value.toLowerCase().trim(),
       password: password.value
-    })
+    });
 
-    userStore.setUser(response.data)
-    // redirect based on role
-    if (userStore.role === 'admin') router.push({ name: 'admin-dashboard' })
-    else router.push('/user/dashboard')
+    const user = response.data;
+    userStore.setUser(user);
+
+    if (user.role === 'admin') {
+      router.push({ name: 'admin-dashboard' });
+    } else {
+      router.push('/user/dashboard');
+    }
   } catch (error) {
-    alert('Login failed')
+    console.error(error);
+    alert(error.response?.data?.message || 'Login failed');
   }
 }
+
 
 
 onMounted(() => {

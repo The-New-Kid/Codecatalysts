@@ -1,5 +1,5 @@
 <template>
-  <UserLayout>
+  <div>
     <!-- HEADER -->
     <div class="relative w-full h-[300px] sm:h-[400px] overflow-hidden shadow-2xl">
       <div class="absolute inset-0">
@@ -13,7 +13,7 @@
 
       <div class="relative z-10 flex flex-col items-center justify-center h-full text-center px-4" data-aos="fade-up">
         <h2 class="text-4xl md:text-5xl font-serif font-bold text-yellow-100 mb-2 drop-shadow-lg">
-          🙏 Darshan Ticket Booking
+          🙏 Sugam Darshan Ticket
         </h2>
         <p class="text-lg md:text-xl text-yellow-200 max-w-2xl mx-auto font-light drop-shadow-md">
           Secure your sacred visit to the divine abode.
@@ -27,12 +27,12 @@
 
         <!-- BOOKER INFORMATION -->
         <h3 class="text-2xl font-serif font-bold text-center mb-8 text-red-800">
-          Booker Information
+          Devotee Information
         </h3>
 
         <div class="space-y-6">
           <div>
-            <label class="block font-semibold mb-1 text-gray-700">Booker Name</label>
+            <label class="block font-semibold mb-1 text-gray-700">Devotee Name</label>
             <input v-model="booker.name"
                    class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300 shadow-sm" />
           </div>
@@ -131,7 +131,25 @@
               👥 Accompanying
             </label>
           </div>
-
+          <!-- ✅ NEW: AGE + GENDER WITH AADHAR -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <input 
+              v-model="p.age" 
+              type="number"
+              min="0"
+              placeholder="Age"
+              class="w-full p-3 border-2 border-gray-300 rounded-xl shadow-sm focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300"
+            />
+            <select 
+              v-model="p.gender"
+              class="w-full p-3 border-2 border-gray-300 rounded-xl shadow-sm focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300 bg-white"
+            >
+              <option value="">Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input 
               v-model="p.otp"
@@ -192,7 +210,7 @@
 
       </div>
     </div>
-  </UserLayout>
+  </div>
 </template>
 
 
@@ -200,13 +218,12 @@
 import { ref, onMounted, computed } from "vue"
 import axios from "axios"
 import { useUserStore } from "@/stores/user"
-import UserLayout from "@/layouts/Userlayoutnew.vue"
 import AOS from 'aos'
 import 'aos/dist/aos.css'
 
 onMounted(() => AOS.init({ duration: 800, once: true }))
 
-const BASE = "http://127.0.0.1:5000/api"
+const BASE = `${import.meta.env.VITE_API_URL}`
 const userStore = useUserStore()
 
 const today = new Date()

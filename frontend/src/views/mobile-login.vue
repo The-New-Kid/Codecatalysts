@@ -12,6 +12,7 @@
           <input
             type="tel"
             v-model="mobile"
+            pattern="^[0-9]{10}$"
             placeholder="Enter 10-digit mobile"
             required
             class="w-full px-5 py-3 rounded-xl border border-gray-300 shadow-inner focus:ring-2 focus:ring-orange-300 transition"
@@ -78,7 +79,7 @@ async function sendOtp() {
   }
 
   try {
-    const response = await axios.post('http://127.0.0.1:5000/api/mobile-login', {
+    const response = await axios.post(`${import.meta.env.VITE_API_URL}/mobile-login`, {
       mobile_number: mobile.value
     })
 
@@ -91,7 +92,7 @@ async function sendOtp() {
 
 async function verifyOtp() {
   try {
-    const response = await axios.post('http://127.0.0.1:5000/api/login-verify-otp', {
+    const response = await axios.post(`${import.meta.env.VITE_API_URL}/login-verify-otp`, {
       mobile_number: mobile.value,
       otp: otp.value
     })

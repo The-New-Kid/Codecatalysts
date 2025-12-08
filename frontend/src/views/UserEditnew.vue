@@ -1,5 +1,5 @@
 <template>
-  <UserLayout>
+  <div>
     <div class="relative w-full h-[300px] sm:h-[350px] overflow-hidden shadow-2xl">
       <div class="absolute inset-0">
         <img 
@@ -112,13 +112,12 @@
         </form>
       </div>
     </div>
-  </UserLayout>
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import UserLayout from '@/layouts/Userlayoutnew.vue'
 import { useUserStore } from '@/stores/user'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
@@ -138,7 +137,7 @@ onMounted(async () => {
   const id = userStore.id || sessionStorage.getItem('user_id')
   if (!id) return
   try {
-    const res = await axios.get(`http://127.0.0.1:5000/api/user/${id}`)
+    const res = await axios.get(`${import.meta.env.VITE_API_URL}/user/${id}`)
     user.value = res.data
   } catch (err) {
     console.error('Error loading profile:', err)
@@ -149,7 +148,7 @@ onMounted(async () => {
 async function updateProfile() {
   const id = userStore.id || sessionStorage.getItem('user_id')
   try {
-    await axios.put(`http://127.0.0.1:5000/api/user/${id}`, user.value)
+    await axios.put(`${import.meta.env.VITE_API_URL}/user/${id}`, user.value)
     userStore.updateProfile({ name: user.value.name })
     alert('Profile updated successfully!')
   } catch (err) {

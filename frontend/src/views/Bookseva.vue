@@ -1,5 +1,5 @@
 <template>
-  <UserLayout>
+  <div>
     <!-- Banner -->
     <div class="relative w-full h-[300px] sm:h-[400px] overflow-hidden shadow-2xl">
       <div class="absolute inset-0">
@@ -26,13 +26,13 @@
       <div class="w-full max-w-3xl bg-white rounded-3xl shadow-2xl p-6 sm:p-10 border-t-8 border-red-700" data-aos="fade-up" data-aos-delay="200">
 
         <h3 class="text-2xl font-serif font-bold text-center mb-8 text-red-800">
-          Booker Information
+          Devotee Information
         </h3>
 
         <div class="space-y-6">
 
           <div>
-            <label class="block font-semibold mb-1 text-gray-700">Booker Name</label>
+            <label class="block font-semibold mb-1 text-gray-700">Devotee Name</label>
             <input 
               v-model="booker.name" 
               class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition duration-300 shadow-sm" 
@@ -112,14 +112,13 @@
 
       </div>
     </div>
-  </UserLayout>
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from "vue"
 import axios from "axios"
 import { useUserStore } from "@/stores/user"
-import UserLayout from "@/layouts/Userlayoutnew.vue"
 import AOS from "aos"
 import "aos/dist/aos.css"
 
@@ -127,7 +126,7 @@ onMounted(() => {
   AOS.init({ duration: 800, once: true })
 })
 
-const BASE = "http://127.0.0.1:5000/api"
+const BASE = import.meta.env.VITE_API_URL
 const userStore = useUserStore()
 
 const booker = ref({ name: "", email: "", mobile_no: "" })

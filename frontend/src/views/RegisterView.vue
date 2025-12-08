@@ -23,6 +23,7 @@
         <input
           v-model="form.name"
           type="text"
+          pattern="^[A-Za-z]+(?: [A-Za-z]+)*$"
           placeholder="Full Name"
           required
           class="w-full px-5 py-3 rounded-xl border border-gray-300 shadow-inner focus:ring-2 focus:ring-orange-300 transition"
@@ -71,6 +72,7 @@
           v-model="form.pincode"
           type="number"
           placeholder="Pincode"
+          pattern="^[0-9]{6}$"
           required
           class="w-full px-5 py-3 rounded-xl border border-gray-300 shadow-inner focus:ring-2 focus:ring-orange-300 transition"
         />
@@ -153,7 +155,7 @@ onMounted(() => {
 
 const handleRegister = async () => {
   try {
-    const response = await axios.post("http://127.0.0.1:5000/api/register", form.value);
+    const response = await axios.post(`${import.meta.env.VITE_API_URL}/register`, form.value);
 
     toastMessage.value = response.data.message || "Registration successful!";
     showToast.value = true;

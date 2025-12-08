@@ -1,5 +1,5 @@
 <template>
-  <UserLayout>
+  <div>
     <div class="max-w-lg mx-auto mt-12 px-4" data-aos="fade-up">
       <h2 class="text-3xl font-extrabold text-center text-indigo-700 mb-8">Book a Parking Spot</h2>
 
@@ -105,15 +105,14 @@
         </form>
       </div>
     </div>
-  </UserLayout>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
-import UserLayout from '@/layouts/Userlayoutnew.vue'
 
-const BASE = 'http://127.0.0.1:5000/api'
+const BASE = import.meta.env.VITE_API_URL
 
 const lotType = ref('public')
 const lots = ref([])

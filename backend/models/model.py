@@ -122,6 +122,7 @@ class PanchangCache(db.Model):
     month = db.Column(db.Integer, nullable=False)
     year = db.Column(db.Integer, nullable=False)
     tithi = db.Column(db.String(100), nullable=False)
+    fest=db.Column(db.String(100),nullable=True)
 
     __table_args__ = (
         db.UniqueConstraint('day', 'month', 'year', name='unique_date_tithi'),

@@ -1,5 +1,5 @@
 <template>
-  <Userlayoutnew>
+  <div>
     
     <div class="relative w-full h-[500px] lg:h-[600px] overflow-hidden shadow-2xl">
       <div class="absolute inset-0">
@@ -15,7 +15,7 @@
         
         <div class="mb-8 animate-fade-in-up">
             <h2 class="text-4xl md:text-6xl font-serif font-bold text-white mb-2 drop-shadow-lg">
-            Jai Mahakal, {{ userStore.name || 'Bhakt' }}
+            Jai Somnath, {{ userStore.name || 'Bhakt' }}
             </h2>
             <p class="text-lg md:text-xl text-yellow-100 max-w-2xl mx-auto font-light drop-shadow-md">
             Manage your darshan bookings and parking seva with ease.
@@ -23,48 +23,48 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-5xl">
-            <RouterLink to="/book-spot" class="glass-btn group bg-orange-600 border-none hover:bg-orange-700">
+            <RouterLink to="book-spot" class="glass-btn group bg-orange-600 border-none hover:bg-orange-700">
                 <div class="icon-circle bg-white text-orange-600">
                     <i data-feather="check-circle" class="w-6 h-6"></i>
                 </div>
                 <div class="text-left">
-                    <span class="block text-sm font-bold text-gray-800 group-hover:text-orange-700">Book Spot</span>
+                    <span class="block text-sm font-bold text-gray-800 group-hover:text-orange-700">Spot Booking</span>
                     <span class="text-xs text-gray-500">Reserve Now</span>
                 </div>
             </RouterLink>
 
-            <RouterLink to="/book_darshannew" class="glass-btn group bg-red-700 border-none hover:bg-red-800">
+            <RouterLink to="book_darshannew" class="glass-btn group bg-red-700 border-none hover:bg-red-800">
                 <div class="icon-circle bg-white text-red-700">
                     <i data-feather="calendar" class="w-6 h-6"></i>
                 </div>
                 <div class="text-left">
-                    <span class="block text-sm font-bold text-gray-800 group-hover:text-red-700">Book Darshan</span>
+                    <span class="block text-sm font-bold text-gray-800 group-hover:text-red-700">Sugam Darshan</span>
                     <span class="text-xs text-gray-600">Get Ticket</span>
                 </div>
             </RouterLink>
             <!--create book aarti button below this comment-->
-            <RouterLink to="/book-aarti" class="glass-btn group bg-yellow-600 border-none hover:bg-yellow-700">
+            <RouterLink to="book-aarti" class="glass-btn group bg-yellow-600 border-none hover:bg-yellow-700">
                 <div class="icon-circle bg-white text-yellow-600">
                     <i data-feather="sun" class="w-6 h-6"></i>
                 </div>
                 <div class="text-left">
-                    <span class="block text-sm font-bold text-gray-800 group-hover:text-yellow-700">Book Aarti</span>
+                    <span class="block text-sm font-bold text-gray-800 group-hover:text-yellow-700">Sugam Aarti</span>
                     <span class="text-xs text-gray-600">Divine Experience</span>
                 </div>
             </RouterLink>
 
             <!--create book seva button below this comment-->
-            <RouterLink to="/book-seva" class="glass-btn group bg-purple-600 border-none hover:bg-purple-700">
+            <RouterLink to="book-seva" class="glass-btn group bg-purple-600 border-none hover:bg-purple-700">
                 <div class="icon-circle bg-white text-purple-600">
                     <i data-feather="gift" class="w-6 h-6"></i>
                 </div>
                 <div class="text-left">
-                    <span class="block text-sm font-bold text-gray-800 group-hover:text-purple-700">Book Seva</span>
+                    <span class="block text-sm font-bold text-gray-800 group-hover:text-purple-700">Seva Daan</span>
                     <span class="text-xs text-gray-600">Offerings & Rituals</span>
                 </div>
             </RouterLink>
               <!-- Tatkal Darshan -->
-              <div>
+              <div >
                 <button
                   v-if="!isTatkalOpen"
                   disabled
@@ -82,7 +82,7 @@
                 <!-- During 7–9 AM -->
                 <RouterLink
                   v-else
-                  to="/book_darshan_tatkal"
+                  to="book_darshan_tatkal"
                   class="glass-btn group bg-red-600 border-none hover:bg-red-700"
                 >
                   <div class="icon-circle bg-white text-red-600">
@@ -114,7 +114,7 @@
 
                 <RouterLink
                   v-else
-                  to="/book_aarti_tatkal"
+                  to="book_aarti_tatkal"
                   class="glass-btn group bg-orange-600 border-none hover:bg-orange-700"
                 >
                   <div class="icon-circle bg-white text-orange-600">
@@ -190,93 +190,13 @@
                     <p class="text-gray-600 mb-4 text-sm">
                         Find comfortable and affordable *Dharamshala* (guesthouse) options near the temple for your stay.
                     </p>
-                    <RouterLink to="/accomodation" class="text-purple-600 hover:text-purple-800 font-medium text-sm flex items-center">
+                    <RouterLink to="/user/accomodation" class="text-purple-600 hover:text-purple-800 font-medium text-sm flex items-center">
                         View Stays <i data-feather="arrow-right" class="w-4 h-4 ml-1"></i>
                     </RouterLink>
                 </div>
             </div>
         </div>
-    </div>
-
-
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        
-      <div class="bg-white rounded-xl shadow-xl border-t-4 border-orange-600 overflow-hidden" data-aos="fade-up">
-        <div class="p-6 border-b border-gray-100 bg-orange-50 flex items-center justify-between">
-            <div>
-                <h3 class="text-2xl font-serif font-bold text-red-800">
-                Recent Parking History
-                </h3>
-                <p class="text-sm text-gray-500">Your past and ongoing vehicle sevas</p>
-            </div>
-            <div class="hidden sm:block">
-                <span class="text-3xl">🚗</span>
-            </div>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="min-w-full table-auto">
-            <thead class="bg-red-900 text-yellow-50">
-              <tr>
-                <th class="px-6 py-4 text-left text-sm font-medium uppercase tracking-wider">Location</th>
-                <th class="px-6 py-4 text-left text-sm font-medium uppercase tracking-wider">Vehicle</th>
-                <th class="px-6 py-4 text-left text-sm font-medium uppercase tracking-wider">Start</th>
-                <th class="px-6 py-4 text-left text-sm font-medium uppercase tracking-wider">End</th>
-                <th class="px-6 py-4 text-left text-sm font-medium uppercase tracking-wider">Dakshina</th>
-                <th class="px-6 py-4 text-left text-sm font-medium uppercase tracking-wider">Action</th>
-              </tr>
-            </thead>
-
-            <tbody class="divide-y divide-gray-200">
-              <tr
-                v-for="r in reservations"
-                :key="r.id"
-                class="hover:bg-orange-50 transition duration-200"
-              >
-                <td class="px-6 py-4">
-                  <span class="font-bold text-gray-800 block">{{ r.prime_location }}</span>
-                  <small class="text-gray-500">{{ r.address }}</small>
-                </td>
-                <td class="px-6 py-4 font-mono text-gray-700">{{ r.vehicle_number || 'N/A' }}</td>
-                <td class="px-6 py-4 text-gray-700">{{ r.start_time }}</td>
-                <td class="px-6 py-4 text-gray-700">
-                  <span v-if="r.end_time">{{ r.end_time }}</span>
-                  <span
-                    v-else
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
-                  >
-                    Ongoing
-                  </span>
-                </td>
-                <td class="px-6 py-4 font-semibold text-red-700">₹{{ r.cost_per_hour }}</td>
-                <td class="px-6 py-4">
-                  <button
-                    v-if="r.end_time"
-                    class="text-gray-400 cursor-not-allowed font-medium text-sm"
-                    disabled
-                  >
-                    Completed
-                  </button>
-                  <button
-                    v-else
-                    @click="releaseSpot(r.id)"
-                    class="bg-orange-500 text-white px-4 py-1.5 rounded-full text-sm font-medium hover:bg-orange-600 transition shadow-sm"
-                  >
-                    Release
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="reservations.length === 0">
-                <td colspan="6" class="px-6 py-12 text-center text-gray-500 italic">
-                  No parking seva history found.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    
+    </div>    
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-24" data-aos="fade-up">
         <div class="bg-red-50 border border-red-200 rounded-xl p-8 md:p-12 text-center shadow-lg">
             <h3 class="text-3xl font-serif font-bold text-red-800 mb-3">
@@ -331,21 +251,17 @@
         </div>
     </footer>
 
-  </Userlayoutnew>
+  </div>
 </template>
 
 <script setup>
-import Userlayoutnew from '@/layouts/Userlayoutnew.vue' // UPDATED IMPORT
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
 import { useUserStore } from '@/stores/user'
 import feather from 'feather-icons'
-
 const userStore = useUserStore()
-const reservations = ref([])
-
 onMounted(async () => {
   feather.replace()
   AOS.init({ duration: 800, once: true })
@@ -355,31 +271,12 @@ onMounted(async () => {
 
   try {
     // Note: Use a more robust way to handle the API base URL in a real app
-    const res = await axios.get(`http://127.0.0.1:5000/api/user/dashboard/${id}`)
+    const res = await axios.get(`${import.meta.env.VITE_API_URL}/user/dashboard/${id}`)
     userStore.name = res.data.user.name
-    reservations.value = res.data.reservations
   } catch (err) {
     console.error('Error loading dashboard:', err)
   }
 })
-
-async function releaseSpot(reservationId) {
-  try {
-    await axios.post(`http://127.0.0.1:5000/api/release/${reservationId}`)
-    // Optimistically update the UI after successful release
-    const index = reservations.value.findIndex(r => r.id === reservationId);
-    if (index !== -1) {
-        // You might want to update the end_time property here instead of filtering it out,
-        // but based on your original logic, filtering/removing is fine.
-        reservations.value = reservations.value.filter((r) => r.id !== reservationId)
-    }
-    // A real application would show a confirmation toast/notification here.
-  } catch (err) {
-    console.error('Error releasing spot:', err)
-    // A real application would show an error toast/notification here.
-  }
-}
-
 
 const isTatkalOpen = ref(false);
 const openMessage = ref("");
@@ -390,8 +287,8 @@ function checkTatkalWindow() {
 
   const current = hour * 60 + minute;      // convert time to minutes
   const start = 7 * 60;                   // 7 AM           
-
-  if (current >= start ) {
+  const end =21*60
+  if (current >= start && current<=end) {
     isTatkalOpen.value = true;
     openMessage.value = "Open Now";
   } 

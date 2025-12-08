@@ -80,11 +80,25 @@
                 <span class="font-bold text-2xl md:text-3xl text-red-900/80 block mb-1 md:mb-2 group-hover:text-red-700 group-hover:scale-110 transition-all duration-300">{{ day }}</span>
               </div>
               
-              <div class="relative z-10 text-center">
-                <small class="text-xs md:text-sm font-medium text-orange-800/70 line-clamp-2 leading-tight px-1 py-1 rounded-lg bg-orange-50 group-hover:bg-orange-100 group-hover:text-orange-900 transition-colors block w-full">
-                  {{ tithiMap[day] || 'No Data' }}
-                </small>
-              </div>
+<div class="relative z-10 text-center">
+  <small 
+    class="text-xs md:text-sm font-medium line-clamp-2 leading-tight px-1 py-1 rounded-lg block w-full transition-colors"
+    :class="{
+      'text-orange-800/70 bg-orange-50 group-hover:bg-orange-100 group-hover:text-orange-900': !tithiMap[day]?.fest,
+      'text-red-900 font-bold bg-red-100 group-hover:bg-red-200 group-hover:text-red-800 border border-red-400': tithiMap[day]?.fest
+    }"
+  >
+    {{ tithiMap[day]?.tithi || 'No Data' }}
+  </small>
+
+  <div 
+    v-if="tithiMap[day]?.fest"
+    class="text-[10px] md:text-xs font-semibold text-red-700 mt-1"
+  >
+    🛕 {{ tithiMap[day].fest }}
+  </div>
+</div>
+
             </div>
           </template>
 
@@ -98,7 +112,7 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 
-const BASE = "http://127.0.0.1:5000/api"
+const BASE =import.meta.env.VITE_API_URL
 
 const currentDate = ref(new Date())
 const tithiMap = ref({})
@@ -132,7 +146,7 @@ async function loadTithi() {
       month: currentMonth.value + 1,
       year: currentYear.value
     })
-
+    console.log(res.data)
     tithiMap.value = res.data
   } catch (e) {
     console.error("Calendar Load Error:", e)
