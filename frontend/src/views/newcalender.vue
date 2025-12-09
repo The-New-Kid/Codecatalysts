@@ -1,6 +1,5 @@
 <template>
   <div>
-
     <!-- ✅ RESPONSIVE BANNER -->
     <div class="relative w-full h-[200px] sm:h-[300px] lg:h-[450px] overflow-hidden shadow-2xl">
       <div class="absolute inset-0">
@@ -56,6 +55,22 @@
           ⚠ Failed to load calendar data. Please try again later.
         </div>
 
+        <!-- ✅ LEGEND -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-4 mb-4 text-[10px] sm:text-xs md:text-sm">
+          <div class="flex items-center gap-1">
+            <span class="inline-block w-3 h-3 rounded-full bg-emerald-200 border border-emerald-400"></span>
+            <span>Low Crowd (&lt; 15k)</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="inline-block w-3 h-3 rounded-full bg-amber-200 border border-amber-400"></span>
+            <span>Moderate (15k–25k)</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="inline-block w-3 h-3 rounded-full bg-red-200 border border-red-400"></span>
+            <span>High (&gt; 25k)</span>
+          </div>
+        </div>
+
         <!-- ✅ DAY HEADERS -->
         <div class="grid grid-cols-7 mb-2 sm:mb-4">
           <div 
@@ -70,13 +85,14 @@
         <!-- ✅ CALENDAR GRID -->
         <div class="grid grid-cols-7 gap-1 sm:gap-2 md:gap-4">
 
+          <!-- Blank cells before 1st -->
           <div 
             v-for="blank in startDay" 
             :key="'b'+blank" 
             class="bg-gray-50/50 rounded-xl min-h-[60px] sm:min-h-[110px]"
           ></div>
 
-          <!-- ✅ LOADING -->
+          <!-- ✅ LOADING SKELETON -->
           <template v-if="loading">
             <div 
               v-for="n in totalDays" 
@@ -93,18 +109,20 @@
               class="group relative bg-white border border-orange-100 rounded-xl p-1.5 sm:p-3 md:p-4 flex flex-col justify-between overflow-hidden min-h-[80px] sm:min-h-[110px] md:min-h-[140px] cursor-pointer transition-all duration-300 ease-out hover:z-10 hover:border-orange-400 hover:shadow-[0_10px_25px_-5px_rgba(234,88,12,0.3)] hover:-translate-y-1 sm:hover:-translate-y-2 stagger-anim"
               :style="{ animationDelay: `${index * 30}ms` }"
             >
-              
               <div class="absolute inset-0 bg-gradient-to-br from-orange-50 via-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
               <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-300 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
+              <!-- Day number -->
               <div class="relative z-10 text-center">
                 <span class="font-bold text-lg sm:text-2xl md:text-3xl text-red-900/80 block mb-0.5 sm:mb-2 group-hover:text-red-700 transition-all duration-300">
                   {{ day }}
                 </span>
               </div>
               
-              <div class="relative z-10 text-center">
+              <!-- Tithi + Festival + Crowd -->
+              <div class="relative z-10 text-center space-y-0.5 sm:space-y-1">
+
+                <!-- Tithi badge -->
                 <small 
                   class="text-[9px] sm:text-xs md:text-sm font-medium line-clamp-2 leading-tight px-1 py-0.5 rounded-lg block w-full transition-colors"
                   :class="{
@@ -115,14 +133,27 @@
                   {{ tithiMap[day]?.tithi || 'No Data' }}
                 </small>
 
+                <!-- Festival line -->
                 <div 
                   v-if="tithiMap[day]?.fest"
-                  class="text-[9px] sm:text-[10px] md:text-xs font-semibold text-red-700 mt-0.5 sm:mt-1"
+                  class="text-[9px] sm:text-[10px] md:text-xs font-semibold text-red-700"
                 >
                   🛕 {{ tithiMap[day].fest }}
                 </div>
-              </div>
 
+                <!-- 🧮 Crowd prediction -->
+                <div
+                  v-if="tithiMap[day]?.crowd !== undefined"
+                  class="inline-flex items-center justify-center mx-auto mt-0.5 sm:mt-1 px-1.5 py-0.5 rounded-full border text-[9px] sm:text-[10px] md:text-xs font-semibold"
+                  :class="crowdClass(tithiMap[day].crowd)"
+                >
+                  👥 {{ formatNumber(tithiMap[day].crowd) }}
+                  <span class="ml-1 uppercase tracking-wide text-[8px] sm:text-[9px]">
+                    ({{ crowdLabel(tithiMap[day].crowd) }})
+                  </span>
+                </div>
+
+              </div>
             </div>
           </template>
 
@@ -136,7 +167,7 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 
-const BASE =import.meta.env.VITE_API_URL
+const BASE = import.meta.env.VITE_API_URL
 
 const currentDate = ref(new Date())
 const tithiMap = ref({})
@@ -153,13 +184,34 @@ const monthName = computed(() =>
 )
 
 const totalDays = computed(() =>
-  new Date(currentYear.value, currentMonth.value+1,0).getDate()
+  new Date(currentYear.value, currentMonth.value + 1, 0).getDate()
 )
 
 const startDay = computed(() =>
-  new Date(currentYear.value, currentMonth.value,1).getDay()
+  new Date(currentYear.value, currentMonth.value, 1).getDay()
 )
 
+// ---- Crowd helpers ----
+function formatNumber(num) {
+  if (num == null) return '—'
+  return Number(num).toLocaleString('en-IN')
+}
+
+function crowdLabel(value) {
+  if (value == null) return 'No Data'
+  if (value < 15000) return 'Low'
+  if (value < 25000) return 'Moderate'
+  return 'High'
+}
+
+function crowdClass(value) {
+  if (value == null) return 'text-gray-700 bg-gray-50 border border-gray-200'
+  if (value < 15000) return 'text-emerald-800 bg-emerald-50 border border-emerald-300'
+  if (value < 25000) return 'text-amber-800 bg-amber-50 border border-amber-300'
+  return 'text-red-800 bg-red-50 border border-red-300'
+}
+
+// ---- API loader ----
 async function loadTithi() {
   loading.value = true
   error.value = false
@@ -170,7 +222,7 @@ async function loadTithi() {
       month: currentMonth.value + 1,
       year: currentYear.value
     })
-    console.log(res.data)
+    console.log("Calendar API:", res.data)
     tithiMap.value = res.data
   } catch (e) {
     console.error("Calendar Load Error:", e)
@@ -181,12 +233,12 @@ async function loadTithi() {
 }
 
 function nextMonth() {
-  currentDate.value = new Date(currentYear.value,currentMonth.value+1,1)
+  currentDate.value = new Date(currentYear.value, currentMonth.value + 1, 1)
   loadTithi()
 }
 
 function prevMonth() {
-  currentDate.value = new Date(currentYear.value,currentMonth.value-1,1)
+  currentDate.value = new Date(currentYear.value, currentMonth.value - 1, 1)
   loadTithi()
 }
 
@@ -204,9 +256,7 @@ onMounted(loadTithi)
     50% { background-color: #fed7aa; }
 }
 
-/* Staggered Entrance Animation 
-   This makes the cards slide up one by one
-*/
+/* Staggered Entrance Animation */
 .stagger-anim {
     animation: fadeInUp 0.5s ease-out backwards;
 }

@@ -90,12 +90,14 @@
             <div>
               <label class="block font-semibold mb-1 text-gray-700">
                 Total Number of Tickets
+                <span class="text-xs text-gray-500">(Max 6)</span>
               </label>
               <input
                 type="number"
                 min="1"
+                :max="6"
                 v-model.number="numMembers"
-                @input="generatePassengers"
+                @input="onNumMembersChange"
                 class="w-full p-2.5 sm:p-3 border-2 border-gray-300 rounded-xl focus:border-red-700 focus:ring-2 focus:ring-red-200 transition shadow-sm"
               />
             </div>
@@ -194,7 +196,6 @@
           </div>
 
           <div class="flex flex-col sm:flex-row gap-3 mb-4">
-            <!-- Info badge instead of checkbox for special flag -->
             <div class="flex items-center gap-2 text-red-700 font-medium">
               <span v-if="p.speciallyAbled">♿ Specially Abled Devotee</span>
               <span v-else>👤 Normal Passenger</span>
@@ -296,9 +297,23 @@ const maxLimit = new Date()
 maxLimit.setDate(today.getDate() + 6)
 const maxDate = maxLimit.toISOString().split("T")[0]
 
+// when user changes total number of tickets
+function onNumMembersChange() {
+  if (numMembers.value < 1) numMembers.value = 1
+  if (numMembers.value > 6) {
+    numMembers.value = 6
+    alert("Maximum 6 devotees can be registered in one booking.")
+  }
+  if (numSpecial.value > numMembers.value) {
+    numSpecial.value = numMembers.value
+  }
+  generatePassengers()
+}
+
 function generatePassengers() {
   // Basic safety on counts
   if (numMembers.value < 1) numMembers.value = 1
+  if (numMembers.value > 6) numMembers.value = 6
   if (numSpecial.value < 0) numSpecial.value = 0
   if (numSpecial.value > numMembers.value) numSpecial.value = numMembers.value
 
@@ -438,6 +453,9 @@ function getNormalIndex(index) {
 async function bookTickets() {
   if (!selectedDate.value) return alert("Please select Darshan date")
   if (!selectedSlot.value) return alert("Please select a slot")
+  if (numMembers.value > 6) {
+    return alert("Maximum 6 devotees can be registered in one booking.")
+  }
   if (passengers.value.some(p => !p.verified)) return alert("Verify all OTPs first")
 
   if (countAccompanying.value > countSpeciallyAbled.value) {
@@ -453,7 +471,7 @@ async function bookTickets() {
     wheelchair_needed: p.wheelchairNeeded ? true : false,
   }))
 
-  const res = await axios.post(`${BASE}/api/book-ticket`, {
+  const res = await axios.post(`${BASE}/book-ticket`, {
     user_id: userStore.id,
     slot_id: selectedSlot.value,
     darshan_date: selectedDate.value,

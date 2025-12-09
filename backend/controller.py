@@ -7,6 +7,7 @@ import os
 import requests
 import calendar
 #from pyzbar.pyzbar import decode
+from crowd_model import predict_crowd_for_date
 from PIL import Image
 import base64 as Base64
 import time
@@ -37,6 +38,12 @@ TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER")
 CONTENT_SID = os.getenv("CONTENT_SID")
 clouflare_url=os.getenv("PUBLIC_BASE_URL")
 TWILIO_CLIENT = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+VANSH_TWILIO_SID=os.getenv("VANSH_TWILIO_SID")
+VANSH_TWILIO_AUTH=os.getenv("VANSH_TWILIO_AUTH")
+TWILIO_SMS_NUMBER=os.getenv("+15188237640")
+
+TWILIO_SMS_CLIENT=Client(VANSH_TWILIO_SID,VANSH_TWILIO_AUTH)
 
 AADHAR_MOBILE_MAP = {
     "111122223333": "+917042213383",#shivang
@@ -384,66 +391,39 @@ class BookTicketResource(Resource):
         os.makedirs(QR_FOLDER, exist_ok=True)
 
         booked_passengers = []
-        special_priority_map = []
 
-        # 1st PASS: assign priority for special passengers
-        for p in passengers:
-            if not p.get("is_special"):
-                special_priority_map.append(None)
-                continue
-
-            age = int(p.get("age", 0))
-            wheelchair_needed = p.get("wheelchair_needed", False)
-
-            # Base priority rules
-            priority = 0
-            if 60 <= age < 70:
-                priority += 1
-            elif age >= 70:
-                priority += 2
-            if wheelchair_needed:
-                priority += 4
-
-            special_priority_map.append(priority)
-
-        # Extract priorities of only specials in original order
-        special_priorities = [pr for pr in special_priority_map if pr is not None]
-        special_index = 0
-
-        # 2nd PASS: save passengers and assign priority
+        # Saving all passengers with updated priority logic
         for idx, p in enumerate(passengers):
             name = p.get("name")
             aadhar = p.get("aadhar")
-            otp_entered = p.get("otp", None)
+            otp_entered = p.get("otp")
 
+            # OTP Check
             if otp_storage.get(aadhar) != otp_entered:
-                return {"success": False, "message": f"OTP failed for {name}"}, 400
+                return {"success": False, "message": f"OTP failed for {name}"}, 402
+
             otp_storage.pop(aadhar, None)
 
             age = int(p.get("age", 0))
+            wheelchair_needed = p.get("wheelchair_needed", False)
             gender = p.get("gender", "")
 
-            is_special = p.get("is_special", False)
-            with_special = p.get("with_special", False)
-            wheelchair_needed = p.get("wheelchair_needed", False)
-
-            if is_special:
-                priority = special_priorities[special_index]
-                special_index += 1
+            # NEW PRIORITY CALCULATION
+            if age >= 70:
+                priority = 3
+            elif age >= 60:
+                priority = 2
             else:
-                # Assign accompanying priority = special counterpart
-                if with_special and special_priorities:
-                    priority = special_priorities[0]  # Link to first special
-                else:
-                    priority = 0
+                priority = 0
+
+            if wheelchair_needed:
+                priority += 4
 
             passenger = Passenger(
                 user_id=user.id,
                 slot_id=slot.id,
                 darshan_date=selected_date,
                 name=name,
-                special=is_special,
-                with_special=with_special,
                 aadhaar_number=aadhar,
                 age=age,
                 gender=gender,
@@ -453,22 +433,27 @@ class BookTicketResource(Resource):
             db.session.add(passenger)
             db.session.flush()
 
+            # Generate QR
             qr_data = str({
                 "name": name,
                 "passenger_id": passenger.id,
                 "darshan_date": darshan_date,
                 "slot_id": slot_id,
                 "aadhar": aadhar,
-                "special": is_special,
-                "with_special": with_special,
                 "priority": priority
             })
             qr_filename = f"passenger_{passenger.id}_{secure_filename(name)}.png"
             encoded = qrgenerator(qr_data, qr_filename)
             passenger.qr_code = encoded
 
+            # WhatsApp Sending
             slot_type = passenger.slot.slot_type
             try:
+                TWILIO_CLIENT.messages.create(
+                    from_=TWILIO_WHATSAPP_NUMBER,
+                    body=f"{slot_type} Ticket #{passenger.id} booked for {name}",
+                    to=f"whatsapp:+91{mobile_number}"
+                )
                 TWILIO_CLIENT.messages.create(
                     from_=TWILIO_WHATSAPP_NUMBER,
                     body=f"{slot_type} Ticket #{passenger.id} booked for {name}",
@@ -487,74 +472,25 @@ class BookTicketResource(Resource):
 
         return {"success": True, "passengers": booked_passengers}, 200
 
+
 api.add_resource(BookTicketResource, '/book-ticket')
 # -------------------------------------------
 API_USER = os.getenv("CALANDER_UID")
 API_KEY = os.getenv("CALANDER_API_KEY")
 
-# class PanchangMonthResource(Resource):
-#     def post(self):
-#         data = request.get_json()
-#         month = data["month"]
-#         year = data["year"]
-#         list_hindu=super(year=year,month=month)
-#         total_days = calendar.monthrange(year, month)[1]
-
-#         result = {}
-
-#         for day in range(1, total_days + 1):
-
-#             # 1. Check cache
-#             cached = PanchangCache.query.filter_by(
-#                 day=day, month=month, year=year
-#             ).first()
-
-#             if cached:
-#                 result[day] = cached.tithi
-#                 continue
-
-#             # 2. Call Astrology API if not cached
-#             payload = {
-#                 "day": day,
-#                 "month": month,
-#                 "year": year,
-#                 "hour": 7,
-#                 "min": 45,
-#                 "lat": 19.132,
-#                 "lon": 72.342,
-#                 "tzone": 5.5
-#             }
-
-#             response = requests.post(
-#                 "https://json.astrologyapi.com/v1/basic_panchang",
-#                 json=payload,
-#                 auth=(API_USER, API_KEY)
-#             )
-
-#             tithi = response.json().get("tithi")
-
-#             # 3. Save in DB
-#             new_entry = PanchangCache(
-#                 day=day,
-#                 month=month,
-#                 year=year,
-#                 tithi=tithi
-#             )
-#             db.session.add(new_entry)
-#             db.session.commit()
-
-#             result[day] = tithi
-
-#         return result, 200
 class PanchangMonthResource(Resource):
     def post(self):
         data = request.get_json()
-        month = data["month"]
-        year = data["year"]
-        print(type(month),type(year))
-        list_hindu = super(year=str(year), month=month) or []    
-        print(list_hindu)
-        # Convert festival list into dictionary: {day: fest_name}
+        month = int(data["month"])
+        year = int(data["year"])
+
+        print(type(month), type(year))
+
+        # 1) Get festivals for this month/year
+        list_hindu = super(year=str(year), month=month) or []
+        print("festivals list:", list_hindu)
+
+        # {day: fest_name}
         festival_map = {}
         for item in list_hindu:
             try:
@@ -562,26 +498,32 @@ class PanchangMonthResource(Resource):
                 n = item.get("name")
                 if d and n:
                     festival_map[d] = n
-            except:
+            except Exception:
                 pass
 
         total_days = calendar.monthrange(year, month)[1]
-        print("fest:",festival_map)
+        print("fest map:", festival_map)
         result = {}
 
         for day in range(1, total_days + 1):
-            fest = festival_map.get(day)
+            fest = festival_map.get(day)  # could be None
+            # for ML model, use "Normal" if no fest
+            fest_label = fest if fest else "Normal"
+
             cached = PanchangCache.query.filter_by(
                 day=day, month=month, year=year
             ).first()
 
-            if cached:
+            if cached and cached.tithi and cached.crowd is not None:
+                # ✅ return cached data
                 result[day] = {
                     "tithi": cached.tithi,
-                    "fest":fest
+                    "fest": cached.fest,
+                    "crowd": cached.crowd
                 }
                 continue
 
+            # ---------- Call external Panchang API ----------
             payload = {
                 "day": day,
                 "month": month,
@@ -598,24 +540,45 @@ class PanchangMonthResource(Resource):
                 json=payload,
                 auth=(API_USER, API_KEY)
             )
-            
-            tithi = response.json().get("tithi")
-              # check if this day has a festival
+            resp_json = response.json()
+            tithi = resp_json.get("tithi")
 
-            new_entry = PanchangCache(
-                day=day,
-                month=month,
-                year=year,
-                tithi=tithi,
-                fest=fest
-            )
-            db.session.add(new_entry)
+            # ---------- Predict crowd for this day ----------
+            try:
+                crowd_pred = predict_crowd_for_date(
+                    year=year,
+                    month=month,
+                    day=day,
+                    festival_label=fest_label
+                )
+            except Exception as e:
+                print(f"[ML ERROR] {year}-{month}-{day}: {e}")
+                crowd_pred = None
+
+            # ---------- Save to cache ----------
+            if cached:
+                cached.tithi = tithi
+                cached.fest = fest
+                cached.crowd = crowd_pred
+            else:
+                new_entry = PanchangCache(
+                    day=day,
+                    month=month,
+                    year=year,
+                    tithi=tithi,
+                    fest=fest,
+                    crowd=crowd_pred
+                )
+                db.session.add(new_entry)
+
             db.session.commit()
 
             result[day] = {
                 "tithi": tithi,
-                "fest": fest
+                "fest": fest,
+                "crowd": crowd_pred
             }
+
         return result, 200
 
 
@@ -921,54 +884,6 @@ api.add_resource(AdminParkingLotResource, "/admin/parking-lots/<int:lot_id>")
 api.add_resource(AdminSpotResource, '/admin/spots/<int:spot_id>')
 api.add_resource(AdminTimeSlotResource, "/admin/time-slots")
 
-
-# class FestivalListResource(Resource):
-#     def get(self):
-#         # Static list abhi ke liye; baad me DB se bhi de sakte hain
-#         festivals_list = [
-#             {"name": "Lohri", "date": "2025-01-13", "density": "Medium"},
-#             {"name": "Makar Sankranti/Pongal", "date": "2025-01-14", "density": "Medium"},
-#             {"name": "Vasant Panchami", "date": "2025-02-02", "density": "Medium"},
-#             {"name": "Maha Shivratri", "date": "2025-02-26", "density": "Medium"},
-#             {"name": "Holika Dahan", "date": "2025-03-13", "density": "High"},
-#             {"name": "Holi", "date": "2025-03-14", "density": "High"},
-#             {"name": "Hindi New Year", "date": "2025-03-20", "density": "High"},
-#             {"name": "Ugadi", "date": "2025-03-30", "density": "High"},
-#             {"name": "Ram Navami", "date": "2025-04-06", "density": "Medium"},
-#             {"name": "Hanuman Jayanti", "date": "2025-04-12", "density": "Medium"},
-#             {"name": "Vaisakhi", "date": "2025-04-14", "density": "Medium"},
-#             {"name": "Akshaya Tritiya", "date": "2025-04-30", "density": "Medium"},
-#             {"name": "Buddha Purnima", "date": "2025-05-12", "density": "High"},
-#             {"name": "Savitri Pooja", "date": "2025-05-26", "density": "Medium"},
-#             {"name": "Puri Rath Yatra", "date": "2025-06-27", "density": "Low"},
-#             {"name": "Guru Purnima", "date": "2025-07-10", "density": "Medium"},
-#             {"name": "Sawan Shivratri", "date": "2025-07-23", "density": "High"},
-#             {"name": "Hariyali Teej", "date": "2025-07-27", "density": "Medium"},
-#             {"name": "Nag Panchami", "date": "2025-07-29", "density": "Medium"},
-#             {"name": "Varalakshmi Vrat", "date": "2025-08-08", "density": "High"},
-#             {"name": "Raksha Bandhan", "date": "2025-08-09", "density": "High"},
-#             {"name": "Krishna Janmashtami", "date": "2025-08-15", "density": "High"},
-#             {"name": "Hartalika Teej", "date": "2025-08-26", "density": "High"},
-#             {"name": "Ganesh Chaturthi", "date": "2025-08-27", "density": "High"},
-#             {"name": "Onam", "date": "2025-09-05", "density": "Medium"},
-#             {"name": "Navaratri Begins", "date": "2025-09-22", "density": "Medium"},
-#             {"name": "Navaratri Ends", "date": "2025-10-01", "density": "High"},
-#             {"name": "Dussehra", "date": "2025-10-02", "density": "High"},
-#             {"name": "Gandhi Jayanti", "date": "2025-10-02", "density": "High"},
-#             {"name": "Sharad Purnima", "date": "2025-10-06", "density": "High"},
-#             {"name": "Karwa Chauth", "date": "2025-10-10", "density": "High"},
-#             {"name": "Dhan Teras", "date": "2025-10-18", "density": "High"},
-#             {"name": "Diwali", "date": "2025-10-20", "density": "High"},
-#             {"name": "Bhai Dooj", "date": "2025-10-23", "density": "High"},
-#             {"name": "Chhath Puja", "date": "2025-10-27", "density": "High"},
-#             {"name": "Kartik Poornima", "date": "2025-11-05", "density": "Low"},
-#             {"name": "Geeta Jayanti", "date": "2025-12-01", "density": "Low"},
-#             {"name": "Dhanu Sankranti", "date": "2025-12-16", "density": "Low"},
-#             {"name": "Christmas", "date": "2025-12-25", "density": "Low"}
-#         ]
-#         return {"festivals": festivals_list}, 200
-# api.add_resource(FestivalListResource, '/festivals')
-# #added
 class AdminPrivateParkingLotsResource(Resource):
     def get(self):
         """Return private lots + spot occupancy for selected date & timeslot."""
@@ -1624,4 +1539,60 @@ api.add_resource(MobileLoginResource, '/mobile-login')
 api.add_resource(LoginverifyotpResource, '/login-verify-otp')
 api.add_resource(ImageserverResource,'/qrcode/<string:filename>')
 api.add_resource(VerifyOtpResource, '/verify-otp')
-api.add_resource(SendOtpResource, "/send-otp")
+api.add_resource(SendOtpResource, '/send-otp')
+
+class SubSlotAllocator(Resource):
+    def post(self):
+        today = datetime.now().date()
+
+        slots = Aarti_and_DarshanSlot.query.all()
+        chunk_minutes = 20
+
+        for slot in slots:
+            passengers = Passenger.query.filter_by(
+                slot_id=slot.id,
+                darshan_date=today
+            ).order_by(Passenger.priority.desc(), Passenger.id).all()
+
+            if not passengers:
+                continue
+
+            start_dt = datetime.combine(today, slot.start_time)
+            end_dt = datetime.combine(today, slot.end_time)
+
+            total_minutes = int((end_dt - start_dt).total_seconds() // 60)
+            num_subslots = max(1, total_minutes // chunk_minutes)
+            per_subslot = max(1, len(passengers) // num_subslots)
+
+            idx = 0
+            for subslot in range(num_subslots):
+                sub_start = start_dt + timedelta(minutes=subslot * chunk_minutes)
+
+                for _ in range(per_subslot):
+                    if idx >= len(passengers):
+                        break
+
+                    passenger = passengers[idx]
+
+                    # Notification time = 30min before subslot
+                    notify_time = sub_start - timedelta(minutes=14)
+
+                    # Send reminder
+                    try:
+                        user = User.query.get(passenger.user_id)
+                        mobile = user.mobile_no
+                        TWILIO_SMS_CLIENT.messages.create(
+                            from_=TWILIO_SMS_NUMBER,
+                            body=f"Reminder: Your Darshan sub-slot starts at "
+                                 f"{sub_start.time().strftime('%H:%M')}. "
+                                 "Please arrive 30 minutes early.",
+                            to=f"+91{mobile}"
+                        )
+                        print(f"Notification sent to {passenger.name} for {sub_start.time()}")
+                    except Exception as e:
+                        print("WhatsApp Error:", e)
+
+                    idx += 1
+
+        return {"success": True, "message": "Sub-slots allocated & reminders sent"}
+api.add_resource(SubSlotAllocator,"/allocate-subslots")

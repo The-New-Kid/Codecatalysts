@@ -287,7 +287,8 @@ async function bookTickets() {
     aadhar: p.aadhar,
     age: p.age,
     gender: p.gender,
-    wheelchair_needed: p.wheelchairNeeded 
+    otp:p.otp,
+    wheelchair_needed: p.wheelchairNeeded
     }))
   }
 

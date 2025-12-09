@@ -65,22 +65,6 @@ class PrivateReservation(db.Model):
     __table_args__ = (db.UniqueConstraint('spot_id', 'date_of_parking', 'timeslot_id', name='unique_private_reservation'),)
 
 
-# class Reservation(db.Model):
-#     __tablename__ = 'reservations'
-#     id = db.Column(db.Integer, primary_key=True)
-#     spot_id = db.Column(db.Integer, db.ForeignKey('parking_spots.id',ondelete='CASCADE'), nullable=False)
-#     user_id = db.Column(db.Integer, db.ForeignKey('users.id',ondelete='CASCADE'), nullable=False)
-#     vehicle_number = db.Column(db.String(20), nullable=True)
-#     parking_timestamp = db.Column(db.DateTime, nullable=False)
-#     leaving_timestamp = db.Column(db.DateTime, nullable=True)
-#     cost_per_hour = db.Column(db.Float, nullable=False)
-
-# class TicketParking(db.Model):
-#     __tablename__ = 'ticket_parking'
-#     id = db.Column(db.Integer, primary_key=True)
-#     spot_id = db.Column(db.Integer, db.ForeignKey('parking_spots.id', ondelete='CASCADE'), nullable=False)
-#     qr_code = db.Column(db.String(200), nullable=True)
-
 class Aarti_and_DarshanSlot(db.Model):
     __tablename__ = 'darshan_slots'
     id = db.Column(db.Integer, primary_key=True)
@@ -127,7 +111,7 @@ class PanchangCache(db.Model):
     year = db.Column(db.Integer, nullable=False)
     tithi = db.Column(db.String(100), nullable=False)
     fest=db.Column(db.String(100),nullable=True)
-
+    crowd=db.Column(db.Integer,nullable=True)
     __table_args__ = (
         db.UniqueConstraint('day', 'month', 'year', name='unique_date_tithi'),
     )

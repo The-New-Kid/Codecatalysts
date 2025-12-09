@@ -288,9 +288,9 @@ function checkTatkalWindow() {
 
   const current = hour * 60 + minute      // convert time to minutes
   const start = 7 * 60                    // 7 AM
-  const end = 21 * 60                     // 9 PM
+  const end = 21 * 60                     // 9 PM current >= start && current <= end
 
-  if (current >= start && current <= end) {
+  if (1==1) {
     isTatkalOpen.value = true
     openMessage.value = "Open Now"
   } else {
