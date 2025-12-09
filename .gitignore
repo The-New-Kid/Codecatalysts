@@ -11,7 +11,7 @@ node_modules/
 dist/
 
 # Environment files
-#.env
+.env
 static/qrcode/
 # VS Code settings
 .vscode/
