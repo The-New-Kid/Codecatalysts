@@ -1,0 +1,62 @@
+id,day,month,year,tithi
+1,1,11,2025,Shukla-Dashami
+2,2,11,2025,Shukla Dwadashi
+3,3,11,2025,Shukla Trayodashi
+4,4,11,2025,Shukla Chaturdashi
+5,5,11,2025,Purnima
+6,6,11,2025,Krishna Pratipada
+7,7,11,2025,Krishna Dwitiya
+8,8,11,2025,Krishna Chaturthi
+9,9,11,2025,Krishna Panchami
+10,10,11,2025,Krishna Shashthi
+11,11,11,2025,Krishna Saptami
+12,12,11,2025,Krishna Ashtami
+13,13,11,2025,Krishna Navami
+14,14,11,2025,Krishna Dashami
+15,15,11,2025,Krishna Ekadashi
+16,16,11,2025,Krishna Dwadashi
+17,17,11,2025,Krishna Trayodashi
+18,18,11,2025,Krishna Chaturdashi
+19,19,11,2025,Krishna Chaturdashi
+20,20,11,2025,Amavasya
+21,21,11,2025,Shukla Pratipada
+22,22,11,2025,Shukla Dwitiya
+23,23,11,2025,Shukla Tritiya
+24,24,11,2025,Shukla Chaturthi
+25,25,11,2025,Shukla Panchami
+26,26,11,2025,Shukla Shashthi
+27,27,11,2025,Shukla-Saptami
+28,28,11,2025,Shukla-Ashtami
+29,29,11,2025,Shukla-Navami
+30,30,11,2025,Shukla-Dashami
+31,1,12,2025,Shukla-Ekadashi
+32,2,12,2025,Shukla Dwadashi
+33,3,12,2025,Shukla Trayodashi
+34,4,12,2025,Shukla Chaturdashi
+35,5,12,2025,Krishna Pratipada
+36,6,12,2025,Krishna Dwitiya
+37,7,12,2025,Krishna Tritiya
+38,8,12,2025,Krishna Chaturthi
+39,9,12,2025,Krishna Panchami
+40,10,12,2025,Krishna Shashthi
+41,11,12,2025,Krishna Saptami
+42,12,12,2025,Krishna Ashtami
+43,13,12,2025,Krishna Navami
+44,14,12,2025,Krishna Dashami
+45,15,12,2025,Krishna Ekadashi
+46,16,12,2025,Krishna Dwadashi
+47,17,12,2025,Krishna Trayodashi
+48,18,12,2025,Krishna Chaturdashi
+49,19,12,2025,Amavasya
+50,20,12,2025,Shukla Pratipada
+51,21,12,2025,Shukla Pratipada
+52,22,12,2025,Shukla Dwitiya
+53,23,12,2025,Shukla Tritiya
+54,24,12,2025,Shukla Chaturthi
+55,25,12,2025,Shukla Panchami
+56,26,12,2025,Shukla Shashthi
+57,27,12,2025,Shukla-Saptami
+58,28,12,2025,Shukla-Ashtami
+59,29,12,2025,Shukla-Navami
+60,30,12,2025,Shukla-Dashami
+61,31,12,2025,Shukla Dwadashi

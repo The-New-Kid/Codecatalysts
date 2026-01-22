@@ -1,0 +1,217 @@
+class AdminParkingLotsResource(Resource):
+    def get(self):
+        """
+        Returns all NON-private parking lots with colored_spots,
+        same logic as admin_dashboard in Jinja controller.
+        """
+        query = request.args.get('q', '').strip()
+        if query:
+            search = f"%{query}%"
+            parking_lots = ParkingLot.query.filter(
+                ParkingLot.prime_location_name.ilike(search),
+                ParkingLot.is_private == False
+            ).all()
+        else:
+            parking_lots = ParkingLot.query.filter_by(is_private=False).all()
+
+        lots_data = []
+
+        for lot in parking_lots:
+            total = lot.max_spots
+            if total <= 0:
+                lots_data.append({
+                    "id": lot.id,
+                    "prime_location_name": lot.prime_location_name,
+                    "max_spots": lot.max_spots,
+                    "occupied_count": 0,
+                    "colored_spots": []
+                })
+                continue
+
+            normal_count = int(0.6 * total)
+            extra_count = int(0.3 * total)
+            vip_count = int(0.1 * total)
+
+            assigned = normal_count + extra_count + vip_count
+            remainder = total - assigned
+            extra_count += remainder
+
+            colored_spots = []
+            # same order as Jinja: iterate lot.spots with index
+            for idx, spot in enumerate(lot.spots):
+                if idx < normal_count:
+                    color = 'green'
+                elif idx < normal_count + extra_count:
+                    color = 'grey'
+                else:
+                    color = 'pink'
+
+                colored_spots.append({
+                    "id": spot.id,
+                    "status": spot.status,
+                    "color": color
+                })
+
+            occupied_count = sum(1 for s in lot.spots if s.status == 'O')
+
+            lots_data.append({
+                "id": lot.id,
+                "prime_location_name": lot.prime_location_name,
+                "max_spots": lot.max_spots,
+                "occupied_count": occupied_count,
+                "colored_spots": colored_spots
+            })
+
+        return lots_data, 200
+    def post(self):
+        """
+        Create a new parking lot.
+        Mirrors Jinja add_lot route:
+        - Creates ParkingLot
+        - Creates ParkingSpot entries based on max_spots
+        """
+        data = request.get_json() or {}
+
+        prime_location_name = data.get("prime_location_name")
+        address = data.get("address")
+        pin_code = data.get("pin_code")
+        price_per_hour = data.get("price_per_hour")
+        max_spots = data.get("max_spots")
+
+        # basic validation
+        if not all([prime_location_name, address, pin_code, price_per_hour, max_spots]):
+            return {"message": "All fields are required."}, 400
+
+        try:
+            pin_code = int(pin_code)
+            max_spots = int(max_spots)
+            price_per_hour = float(price_per_hour)
+        except ValueError:
+            return {"message": "Invalid numeric value(s)."}, 400
+
+        if max_spots <= 0:
+            return {"message": "Max spots must be positive."}, 400
+
+        # Create lot (assuming is_private default False for public lots)
+        new_lot = ParkingLot(
+            prime_location_name=prime_location_name,
+            address=address,
+            pin_code=pin_code,
+            price_per_hour=price_per_hour,
+            max_spots=max_spots,
+            is_private=False
+        )
+
+        db.session.add(new_lot)
+        db.session.flush()  # to get new_lot.id before commit
+
+        # Create ParkingSpot rows
+        for _ in range(max_spots):
+            spot = ParkingSpot(
+                lot_id=new_lot.id,
+                status='A'   # Available by default
+            )
+            db.session.add(spot)
+
+        db.session.commit()
+
+        return {
+            "message": "Parking lot created successfully.",
+            "lot": {
+                "id": new_lot.id,
+                "prime_location_name": new_lot.prime_location_name,
+                "address": new_lot.address,
+                "pin_code": new_lot.pin_code,
+                "price_per_hour": new_lot.price_per_hour,
+                "max_spots": new_lot.max_spots,
+                "is_private": new_lot.is_private
+            }
+        }, 201
+
+class AdminParkingLotResource(Resource):
+    def delete(self, lot_id):
+        lot = ParkingLot.query.get(lot_id)
+        if not lot:
+            return {"message": "Parking lot not found"}, 404
+
+        db.session.delete(lot)
+        db.session.commit()
+        return {"message": "Parking lot deleted successfully"}, 200
+
+
+api.add_resource(AdminParkingLotsResource, "/admin/parking-lots")
+api.add_resource(AdminParkingLotResource, "/admin/parking-lots/<int:lot_id>")
+
+#Added
+class AdminSpotResource(Resource):
+    def get(self, spot_id):
+        """
+        Same as Jinja spot_detail:
+        - compute color based on distribution in this lot
+        - return spot + lot info
+        """
+        spot = ParkingSpot.query.get(spot_id)
+        if not spot:
+            return {"message": "Spot not found"}, 404
+
+        lot = spot.lot
+
+        # color logic copied from /spot/<spot_id>
+        if not lot.is_private:
+            total = lot.max_spots
+            normal_count = int(0.6 * total)
+            extra_count = int(0.3 * total)
+            vip_count = int(0.1 * total)
+            assigned = normal_count + extra_count + vip_count
+            remainder = total - assigned
+            extra_count += remainder
+
+            # spot index in lot.spots (same as Jinja)
+            spots_list = list(lot.spots)
+            spot_index = spots_list.index(spot)
+
+            if spot_index < normal_count:
+                color = 'green'
+            elif spot_index < normal_count + extra_count:
+                color = 'grey'
+            else:
+                color = 'pink'
+        else:
+            color = 'green'
+
+        return {
+            "spot": {
+                "id": spot.id,
+                "status": spot.status,  # 'A' or 'O'
+                "color": color,
+                "lot_id": lot.id
+            },
+            "lot": {
+                "id": lot.id,
+                "prime_location_name": lot.prime_location_name,
+                "is_private": lot.is_private
+            }
+        }, 200
+
+    def delete(self, spot_id):
+        """
+        Same rules as Jinja delete_spot:
+        - only delete if spot.status == 'A'
+        - decrement lot.max_spots
+        """
+        spot = ParkingSpot.query.get(spot_id)
+        if not spot:
+            return {"message": "Spot not found"}, 404
+
+        if spot.status != 'A':
+            return {
+                "message": "Cannot delete: This spot is currently occupied."
+            }, 400
+
+        lot = spot.lot
+        lot.max_spots -= 1
+        db.session.delete(spot)
+        db.session.commit()
+
+        return {"message": "Spot deleted successfully."}, 200
+api.add_resource(AdminSpotResource, '/admin/spots/<int:spot_id>')
