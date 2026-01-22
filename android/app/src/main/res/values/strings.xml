@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Devdham</string>
-    <string name="title_activity_main">Devdham</string>
-    <string name="package_name">com.Devdham.app</string>
-    <string name="custom_url_scheme">com.Devdham.app</string>
-</resources>
