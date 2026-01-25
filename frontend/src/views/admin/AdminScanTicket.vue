@@ -49,8 +49,7 @@
 import { ref, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 
-// Adjust if your Flask API is namespaced differently
-const API_BASE = 'http://127.0.0.1:5000/api' // change if needed
+const API_BASE = `${import.meta.env.VITE_API_URL}`
 
 // reactive state
 const cameraVisible = ref(false)
@@ -63,117 +62,124 @@ const uploading = ref(false)
 
 let stream = null
 let scanning = false
+let alreadyDetected = false
+
 const video = ref(null)
 
 const onFileChange = (e) => {
   selectedFile.value = e.target.files[0] || null
 }
 
-// optional image upload handler (uses your existing image endpoint)
+// ---------- IMAGE SCAN ----------
 const uploadImage = async () => {
   if (!selectedFile.value) {
     alert('Select an image first.')
     return
   }
-  uploading.value = true
+
+  qrResultText.value = 'Scanning image…'
+  ticket.value = null
+
   try {
     const fd = new FormData()
     fd.append('qr_image', selectedFile.value)
+
     const res = await axios.post(`${API_BASE}/scan-ticket/image`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
-    qrResultText.value = res.data.message || 'Image scanned'
+
+    qrResultText.value = res.data.message || 'Scan complete'
     ticket.value = res.data.ticket || null
+
   } catch (err) {
-    console.error(err)
-    qrResultText.value = err?.response?.data?.message || 'Failed to scan image.'
-  } finally {
-    uploading.value = false
+    qrResultText.value = err?.response?.data?.message || 'Image scan failed'
   }
 }
 
+// ---------- LIVE CAMERA SCAN ----------
 const openCamera = async () => {
-  qrResultText.value = ''
+  qrResultText.value = 'Opening camera…'
+  ticket.value = null
   cameraVisible.value = true
   scanning = true
+  alreadyDetected = false
 
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    if (video.value == null) {
-      // assign video ref from DOM
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    })
+
+    if (!video.value) {
       video.value = document.querySelector('#video')
     }
+
     video.value.srcObject = stream
-    // try to play (mobile may require user gesture; this is initiated by button click)
-    try { await video.value.play() } catch (e) { /* ignore */ }
+    await video.value.play()
 
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
 
     const tick = async () => {
-      if (!scanning) return
-      if (!video.value) return
+      if (!scanning || alreadyDetected) return
 
       if (video.value.readyState === video.value.HAVE_ENOUGH_DATA) {
-        canvas.width = video.value.videoWidth || 400
-        canvas.height = video.value.videoHeight || 300
+        canvas.width = video.value.videoWidth
+        canvas.height = video.value.videoHeight
         ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
+
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-        // use jsQR (make sure jsQR script is loaded in index.html or this page)
+
         if (window.jsQR) {
           const code = window.jsQR(imageData.data, canvas.width, canvas.height)
-          if (code) {
-            // show plain result
-            qrResultText.value = `QR Detected: ${code.data}`
 
-            // send the decoded QR payload to backend
+          if (code) {
+            alreadyDetected = true
+            qrResultText.value = 'QR detected. Verifying…'
+
             try {
               const res = await fetch(`${API_BASE}/scan-ticket/live`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ qr_text: code.data })
               })
+
               const data = await res.json()
-              // display server message and ticket
-              qrResultText.value = data.message || qrResultText.value
-              ticket.value = data.ticket || ticket.value
+              qrResultText.value = data.message || 'Verification complete'
+              ticket.value = data.ticket || null
+
             } catch (err) {
-              console.error('Error validating ticket:', err)
               qrResultText.value = 'Server validation failed'
             }
 
-            // stop scanning and camera
-            scanning = false
             stopCamera()
             return
           }
-        } else {
-          // fallback: jsQR not available
-          qrResultText.value = 'jsQR library not loaded'
         }
       }
+
       requestAnimationFrame(tick)
     }
 
     requestAnimationFrame(tick)
+
   } catch (err) {
-    console.error('camera error', err)
-    qrResultText.value = 'Unable to access camera. Allow camera permission.'
-    cameraVisible.value = false
-    scanning = false
+    qrResultText.value = 'Camera access denied'
+    stopCamera()
   }
 }
 
+// ---------- CAMERA CLEANUP ----------
 const stopCamera = () => {
   scanning = false
   cameraVisible.value = false
+
   if (stream) {
     stream.getTracks().forEach(t => t.stop())
     stream = null
   }
-  // clear video element srcObject
+
   if (video.value) {
-    try { video.value.srcObject = null } catch (e) {}
+    try { video.value.srcObject = null } catch {}
   }
 }
 
@@ -183,6 +189,7 @@ onBeforeUnmount(() => {
   stopCamera()
 })
 </script>
+
 
 <style scoped>
 #cameraFrame {
