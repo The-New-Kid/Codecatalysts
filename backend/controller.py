@@ -1,3 +1,14 @@
+from asyncio import gather
+from twilio.twiml.voice_response import VoiceResponse, Gather
+
+# routes_emergency.py
+from flask import Blueprint, request, jsonify
+from datetime import datetime, timezone
+from collections import deque
+import uuid
+from math import radians, sin, cos, sqrt, atan2
+
+from blockchain.registry import issue_hash
 import ast
 from flask import request,current_app as app,make_response,send_from_directory
 from flask_restful import Api,Resource,fields, marshal_with,marshal
@@ -7,6 +18,7 @@ import os
 import requests
 import calendar
 #from pyzbar.pyzbar import decode
+from crowd_model import predict_crowd_for_date
 from PIL import Image
 import base64 as Base64
 import time
@@ -21,16 +33,14 @@ from flask_restful import Resource
 from sqlalchemy import and_
 from datetime import timedelta
 import json
+import hashlib
 import cv2
 from werkzeug.security import generate_password_hash, check_password_hash
 from gittest import super
-from crowd_model import predict_crowd_for_date
-from twilio.twiml.voice_response import VoiceResponse, Gather
-
 load_dotenv()
 CURRENT_COUNT_MANDIR=0
-MAX_COUNT_MANDIR=1
-MIN_COUNT_MADIR=0
+MAX_COUNT_MANDIR=3
+MIN_COUNT_MADIR=1
 FLAG=0
 api=Api(prefix='/api')
 otp_login_storage = {}
@@ -41,20 +51,20 @@ CONTENT_SID = os.getenv("CONTENT_SID")
 clouflare_url=os.getenv("PUBLIC_BASE_URL")
 TWILIO_CLIENT = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
+VANSH_TWILIO_SID=os.getenv("VANSH_TWILIO_SID")
+VANSH_TWILIO_AUTH=os.getenv("VANSH_TWILIO_AUTH")
+TWILIO_SMS_NUMBER=os.getenv("TWILIO_SMS_NUMBER")
+
+TWILIO_SMS_CLIENT=Client(VANSH_TWILIO_SID,VANSH_TWILIO_AUTH)
+POLICE_NUMBER="+916389890800"
+
 IVR_TWILIO_SID = os.getenv("IVR_TWILIO_SID")
 IVR_AUTH_TOKEN = os.getenv("IVR_AUTH_TOKEN")
 IVR_NUMBER = os.getenv("IVR_NUMBER")
 
 IVR_CLIENT = Client(IVR_TWILIO_SID, IVR_AUTH_TOKEN, IVR_NUMBER)
-
-SMS_SID = os.getenv("SMS_SID")
-SMS_TOKEN = os.getenv("SMS_TOKEN")
-SMS_NUMBER = os.getenv("SMS_NUMBER")
-
-SMS_CLIENT = Client(SMS_SID, SMS_TOKEN, SMS_NUMBER)
-
-SECURITY_OFFICER = "+917456097831"
-SHUTTLE_BUS = "6396526619"
+SHUTTLE_BUS_VAALA="+916396526619"
+SECURITY_OFFICER_NUMBER="+917456097831"
 
 AADHAR_MOBILE_MAP = {
     "111122223333": "+917042213383",#shivang
@@ -117,7 +127,7 @@ class VerifyOtpResource(Resource):
 
 class ImageserverResource(Resource):
     def get(self, filename):
-        base_path = os.path.abspath(os.path.join(app.root_path, '..', 'static', 'qrcode'))
+        base_path = os.path.abspath(os.path.join(app.root_path, '..','backend', 'static', 'qrcode'))
         response = make_response(send_from_directory(base_path, filename))
         response.headers['Content-Type'] = mimetypes.guess_type(filename)[0] or 'image/png'
         return response
@@ -205,7 +215,13 @@ class LoginResource(Resource):
         if not check_password_hash(user.password, password):
             return {"message": "Incorrect password"}, 401
 
-        role = "admin" if user.role == 0 else "user"
+        # 🔹 Map numeric role -> string role
+        if user.role == 0:
+            role = "admin"
+        elif user.role == 2:
+            role = "securityguard"   # 👈 NEW
+        else:
+            role = "user"
 
         return {
             "message": "Login successful",
@@ -369,7 +385,7 @@ class BookTicketResource(Resource):
         darshan_date = data.get("darshan_date")
         passengers = data.get("passengers", [])
         mobile_number = data.get("booker_mobile") or data.get("mobile_number")
-
+        type=data.get("type")
         if not darshan_date:
             return {"success": False, "message": "Darshan date missing"}, 400
 
@@ -384,6 +400,23 @@ class BookTicketResource(Resource):
         except:
             return {"success": False, "message": "Invalid date format"}, 400
 
+        print(selected_date)
+        max_visitor_multiplier=None
+        if type=="aarti" or type=="darshan":
+            max_visitor_multiplier=0.75
+        elif type=="aarti_tatkal" or type=="darshan_tatkal":
+            max_visitor_multiplier=0.2
+        else:
+            pass
+        crowd=PanchangCache.query.filter_by(day=selected_date.day,month=selected_date.month,year=selected_date.year).first()
+        print(crowd.crowd)
+        print(max_visitor_multiplier)
+        if(crowd.crowd<15000):
+            max_visitor_multiplier=max_visitor_multiplier*0.8
+        elif(crowd.crowd>=15000 and crowd.crowd<25000):
+            max_visitor_multiplier=max_visitor_multiplier*0.9
+        else:
+            pass
         num_members = len(passengers)
 
         already_booked = Passenger.query.filter_by(
@@ -391,10 +424,10 @@ class BookTicketResource(Resource):
             darshan_date=selected_date
         ).count()
 
-        if already_booked + num_members > slot.max_visitors:
+        if already_booked + num_members > int(slot.max_visitors*max_visitor_multiplier):
             return {
                 "success": False,
-                "message": f"Only {slot.max_visitors - already_booked} slots left"
+                "message": f"Only {int(slot.max_visitors*max_visitor_multiplier) - already_booked} slots left"
             }, 400
 
         # QR Setup
@@ -402,66 +435,39 @@ class BookTicketResource(Resource):
         os.makedirs(QR_FOLDER, exist_ok=True)
 
         booked_passengers = []
-        special_priority_map = []
 
-        # 1st PASS: assign priority for special passengers
-        for p in passengers:
-            if not p.get("is_special"):
-                special_priority_map.append(None)
-                continue
-
-            age = int(p.get("age", 0))
-            wheelchair_needed = p.get("wheelchair_needed", False)
-
-            # Base priority rules
-            priority = 0
-            if 60 <= age < 70:
-                priority += 1
-            elif age >= 70:
-                priority += 2
-            if wheelchair_needed:
-                priority += 4
-
-            special_priority_map.append(priority)
-
-        # Extract priorities of only specials in original order
-        special_priorities = [pr for pr in special_priority_map if pr is not None]
-        special_index = 0
-
-        # 2nd PASS: save passengers and assign priority
+        # Saving all passengers with updated priority logic
         for idx, p in enumerate(passengers):
             name = p.get("name")
             aadhar = p.get("aadhar")
-            otp_entered = p.get("otp", None)
+            otp_entered = p.get("otp")
 
+            # OTP Check
             if otp_storage.get(aadhar) != otp_entered:
-                return {"success": False, "message": f"OTP failed for {name}"}, 400
+                return {"success": False, "message": f"OTP failed for {name}"}, 402
+
             otp_storage.pop(aadhar, None)
 
             age = int(p.get("age", 0))
+            wheelchair_needed = p.get("wheelchair_needed", False)
             gender = p.get("gender", "")
 
-            is_special = p.get("is_special", False)
-            with_special = p.get("with_special", False)
-            wheelchair_needed = p.get("wheelchair_needed", False)
-
-            if is_special:
-                priority = special_priorities[special_index]
-                special_index += 1
+            # NEW PRIORITY CALCULATION
+            if age >= 70:
+                priority = 3
+            elif age >= 60:
+                priority = 2
             else:
-                # Assign accompanying priority = special counterpart
-                if with_special and special_priorities:
-                    priority = special_priorities[0]  # Link to first special
-                else:
-                    priority = 0
+                priority = 0
+
+            if wheelchair_needed:
+                priority += 4
 
             passenger = Passenger(
                 user_id=user.id,
                 slot_id=slot.id,
                 darshan_date=selected_date,
                 name=name,
-                special=is_special,
-                with_special=with_special,
                 aadhaar_number=aadhar,
                 age=age,
                 gender=gender,
@@ -471,22 +477,35 @@ class BookTicketResource(Resource):
             db.session.add(passenger)
             db.session.flush()
 
-            qr_data = str({
-                "name": name,
-                "passenger_id": passenger.id,
-                "darshan_date": darshan_date,
-                "slot_id": slot_id,
-                "aadhar": aadhar,
-                "special": is_special,
-                "with_special": with_special,
-                "priority": priority
-            })
+            # Generate QR
+            metadata = {
+                    "name": name,
+                    "passenger_id": passenger.id,
+                    "darshan_date": str(darshan_date),
+                    "slot_id": slot_id,
+                    "aadhar": aadhar,
+                    "priority": priority
+                }
+            metadata_json = json.dumps(metadata, sort_keys=True, separators=(",", ":"))
+            hash_hex = hashlib.sha256(metadata_json.encode()).hexdigest()
+            issue_hash(hash_hex)
+            qr_payload = {
+                "metadata": metadata,
+                "hash": hash_hex
+            }
+            qr_data = json.dumps(qr_payload, separators=(",", ":"))
             qr_filename = f"passenger_{passenger.id}_{secure_filename(name)}.png"
             encoded = qrgenerator(qr_data, qr_filename)
             passenger.qr_code = encoded
 
+            # WhatsApp Sending
             slot_type = passenger.slot.slot_type
             try:
+                TWILIO_CLIENT.messages.create(
+                    from_=TWILIO_WHATSAPP_NUMBER,
+                    body=f"{slot_type} Ticket #{passenger.id} booked for {name}",
+                    to=f"whatsapp:+91{mobile_number}"
+                )
                 TWILIO_CLIENT.messages.create(
                     from_=TWILIO_WHATSAPP_NUMBER,
                     body=f"{slot_type} Ticket #{passenger.id} booked for {name}",
@@ -502,29 +521,8 @@ class BookTicketResource(Resource):
             })
 
         db.session.commit()
-
         return {"success": True, "passengers": booked_passengers}, 200
 
-api.add_resource(BookTicketResource, '/book-ticket')
-
-def find_first_available_slot(slot_type, darshan_date):
-    """
-    Find the earliest slot of given type (e.g. 'Darshan')
-    that still has capacity on the given date.
-    """
-    slots = Aarti_and_DarshanSlot.query.filter_by(
-        slot_type=slot_type
-    ).order_by(Aarti_and_DarshanSlot.start_time).all()
-
-    for slot in slots:
-        booked = Passenger.query.filter_by(
-            slot_id=slot.id,
-            darshan_date=darshan_date
-        ).count()
-        if booked < slot.max_visitors:
-            return slot
-
-    return None
 
 def get_ordered_darshan_slots():
     """
@@ -535,64 +533,13 @@ def get_ordered_darshan_slots():
         slot_type="Darshan"
     ).order_by(Aarti_and_DarshanSlot.start_time).all()
 
+
+
+api.add_resource(BookTicketResource, '/book-ticket')
 # -------------------------------------------
 API_USER = os.getenv("CALANDER_UID")
 API_KEY = os.getenv("CALANDER_API_KEY")
 
-# class PanchangMonthResource(Resource):
-#     def post(self):
-#         data = request.get_json()
-#         month = data["month"]
-#         year = data["year"]
-#         list_hindu=super(year=year,month=month)
-#         total_days = calendar.monthrange(year, month)[1]
-
-#         result = {}
-
-#         for day in range(1, total_days + 1):
-
-#             # 1. Check cache
-#             cached = PanchangCache.query.filter_by(
-#                 day=day, month=month, year=year
-#             ).first()
-
-#             if cached:
-#                 result[day] = cached.tithi
-#                 continue
-
-#             # 2. Call Astrology API if not cached
-#             payload = {
-#                 "day": day,
-#                 "month": month,
-#                 "year": year,
-#                 "hour": 7,
-#                 "min": 45,
-#                 "lat": 19.132,
-#                 "lon": 72.342,
-#                 "tzone": 5.5
-#             }
-
-#             response = requests.post(
-#                 "https://json.astrologyapi.com/v1/basic_panchang",
-#                 json=payload,
-#                 auth=(API_USER, API_KEY)
-#             )
-
-#             tithi = response.json().get("tithi")
-
-#             # 3. Save in DB
-#             new_entry = PanchangCache(
-#                 day=day,
-#                 month=month,
-#                 year=year,
-#                 tithi=tithi
-#             )
-#             db.session.add(new_entry)
-#             db.session.commit()
-
-#             result[day] = tithi
-
-#         return result, 200
 class PanchangMonthResource(Resource):
     def post(self):
         data = request.get_json()
@@ -999,54 +946,6 @@ api.add_resource(AdminParkingLotResource, "/admin/parking-lots/<int:lot_id>")
 api.add_resource(AdminSpotResource, '/admin/spots/<int:spot_id>')
 api.add_resource(AdminTimeSlotResource, "/admin/time-slots")
 
-
-# class FestivalListResource(Resource):
-#     def get(self):
-#         # Static list abhi ke liye; baad me DB se bhi de sakte hain
-#         festivals_list = [
-#             {"name": "Lohri", "date": "2025-01-13", "density": "Medium"},
-#             {"name": "Makar Sankranti/Pongal", "date": "2025-01-14", "density": "Medium"},
-#             {"name": "Vasant Panchami", "date": "2025-02-02", "density": "Medium"},
-#             {"name": "Maha Shivratri", "date": "2025-02-26", "density": "Medium"},
-#             {"name": "Holika Dahan", "date": "2025-03-13", "density": "High"},
-#             {"name": "Holi", "date": "2025-03-14", "density": "High"},
-#             {"name": "Hindi New Year", "date": "2025-03-20", "density": "High"},
-#             {"name": "Ugadi", "date": "2025-03-30", "density": "High"},
-#             {"name": "Ram Navami", "date": "2025-04-06", "density": "Medium"},
-#             {"name": "Hanuman Jayanti", "date": "2025-04-12", "density": "Medium"},
-#             {"name": "Vaisakhi", "date": "2025-04-14", "density": "Medium"},
-#             {"name": "Akshaya Tritiya", "date": "2025-04-30", "density": "Medium"},
-#             {"name": "Buddha Purnima", "date": "2025-05-12", "density": "High"},
-#             {"name": "Savitri Pooja", "date": "2025-05-26", "density": "Medium"},
-#             {"name": "Puri Rath Yatra", "date": "2025-06-27", "density": "Low"},
-#             {"name": "Guru Purnima", "date": "2025-07-10", "density": "Medium"},
-#             {"name": "Sawan Shivratri", "date": "2025-07-23", "density": "High"},
-#             {"name": "Hariyali Teej", "date": "2025-07-27", "density": "Medium"},
-#             {"name": "Nag Panchami", "date": "2025-07-29", "density": "Medium"},
-#             {"name": "Varalakshmi Vrat", "date": "2025-08-08", "density": "High"},
-#             {"name": "Raksha Bandhan", "date": "2025-08-09", "density": "High"},
-#             {"name": "Krishna Janmashtami", "date": "2025-08-15", "density": "High"},
-#             {"name": "Hartalika Teej", "date": "2025-08-26", "density": "High"},
-#             {"name": "Ganesh Chaturthi", "date": "2025-08-27", "density": "High"},
-#             {"name": "Onam", "date": "2025-09-05", "density": "Medium"},
-#             {"name": "Navaratri Begins", "date": "2025-09-22", "density": "Medium"},
-#             {"name": "Navaratri Ends", "date": "2025-10-01", "density": "High"},
-#             {"name": "Dussehra", "date": "2025-10-02", "density": "High"},
-#             {"name": "Gandhi Jayanti", "date": "2025-10-02", "density": "High"},
-#             {"name": "Sharad Purnima", "date": "2025-10-06", "density": "High"},
-#             {"name": "Karwa Chauth", "date": "2025-10-10", "density": "High"},
-#             {"name": "Dhan Teras", "date": "2025-10-18", "density": "High"},
-#             {"name": "Diwali", "date": "2025-10-20", "density": "High"},
-#             {"name": "Bhai Dooj", "date": "2025-10-23", "density": "High"},
-#             {"name": "Chhath Puja", "date": "2025-10-27", "density": "High"},
-#             {"name": "Kartik Poornima", "date": "2025-11-05", "density": "Low"},
-#             {"name": "Geeta Jayanti", "date": "2025-12-01", "density": "Low"},
-#             {"name": "Dhanu Sankranti", "date": "2025-12-16", "density": "Low"},
-#             {"name": "Christmas", "date": "2025-12-25", "density": "Low"}
-#         ]
-#         return {"festivals": festivals_list}, 200
-# api.add_resource(FestivalListResource, '/festivals')
-# #added
 class AdminPrivateParkingLotsResource(Resource):
     def get(self):
         """Return private lots + spot occupancy for selected date & timeslot."""
@@ -1125,10 +1024,6 @@ if not os.path.exists(UPLOAD_FOLDER):
     
 class ScanTicketImageResource(Resource):
     def post(self):
-        """
-        Handle QR image upload, decode ticket id, and update ticket status/scan_count.
-        Mirrors the logic of the Jinja /scan-ticket route.
-        """
         ticket = None
 
         file = request.files.get('qr_image')
@@ -1139,40 +1034,78 @@ class ScanTicketImageResource(Resource):
             }, 400
 
         try:
-            # Save file (same pattern as original)
+            # Save image
             filename = secure_filename(file.filename)
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             file.save(filepath)
-            print(filepath)
-            img = cv2.imread(filepath)
 
+            img = cv2.imread(filepath)
             detector = cv2.QRCodeDetector()
             data, bbox, _ = detector.detectAndDecode(img)
 
-            if data:
-                try:
-                    decoded = Base64.b64decode(data).decode("utf-8")
-                except Exception:
-                    decoded = data
-                print(decoded)
-            else:
+            if not data:
                 return {
                     "success": False,
                     "message": "❌ Could not read QR code."
                 }, 400
 
+            # Handle base64 or plain text
             try:
-                data = ast.literal_eval(decoded)
-                passenger_id = data['passenger_id']
-                print(passenger_id)
-                print(type(passenger_id))
-            except:
-                print("kutta bacha")
+                decoded = Base64.b64decode(data).decode("utf-8")
+            except Exception:
+                decoded = data
+
+            # ---------------- QR PARSING ---------------- #
+            try:
+                qr_payload = json.loads(decoded)
+                metadata = qr_payload.get("metadata")
+                hash_from_qr = qr_payload.get("hash")
+
+                if not metadata or not hash_from_qr:
+                    return {
+                        "success": False,
+                        "message": "❌ Invalid QR format."
+                    }, 400
+
+                passenger_id = metadata.get("passenger_id")
+                if not passenger_id:
+                    return {
+                        "success": False,
+                        "message": "❌ Passenger ID missing."
+                    }, 400
+
+            except Exception:
                 return {
                     "success": False,
                     "message": "❌ Invalid QR code content."
                 }, 400
 
+            # ---------------- HASH INTEGRITY CHECK ---------------- #
+            metadata_json = json.dumps(
+                metadata,
+                sort_keys=True,
+                separators=(",", ":")
+            )
+            recomputed_hash = hashlib.sha256(
+                metadata_json.encode()
+            ).hexdigest()
+
+            if recomputed_hash != hash_from_qr:
+                return {
+                    "success": False,
+                    "message": "❌ QR data has been tampered."
+                }, 403
+
+            # ---------------- BLOCKCHAIN VERIFICATION ---------------- #
+            from blockchain.registry import verify_hash
+
+            if not verify_hash(hash_from_qr):
+                return {
+                    "success": False,
+                    "message": "❌ Ticket invalid or revoked (blockchain)."
+                }, 403
+
+            # ---------------- EXISTING DB + GATE LOGIC ---------------- #
             ticket = Passenger.query.get(passenger_id)
             if not ticket:
                 return {
@@ -1181,32 +1114,51 @@ class ScanTicketImageResource(Resource):
                 }, 404
 
             global CURRENT_COUNT_MANDIR
+            global MAX_COUNT_MANDIR
+            global MIN_COUNT_MADIR
             global FLAG
 
-            # ----- Crowd / scan logic -----
+            if MAX_COUNT_MANDIR == CURRENT_COUNT_MANDIR:
+                FLAG = 1
+                TWILIO_CLIENT.messages.create(
+                    from_=TWILIO_WHATSAPP_NUMBER,
+                    body="STOP BUS SERVICE.",
+                    to=f"whatsapp:{SHUTTLE_BUS_VAALA}"
+                )
+                TWILIO_CLIENT.messages.create(
+                    from_=TWILIO_WHATSAPP_NUMBER,
+                    body="CLOSE GATES",
+                    to=f"whatsapp:{SECURITY_OFFICER_NUMBER}"
+                )
+
+            if MIN_COUNT_MADIR == CURRENT_COUNT_MANDIR:
+                FLAG = 0
+                TWILIO_CLIENT.messages.create(
+                    from_=TWILIO_WHATSAPP_NUMBER,
+                    body="START BUS SERVICE.",
+                    to=f"whatsapp:{SHUTTLE_BUS_VAALA}"
+                )
+                TWILIO_CLIENT.messages.create(
+                    from_=TWILIO_WHATSAPP_NUMBER,
+                    body="GATES OPENING",
+                    to=f"whatsapp:{SECURITY_OFFICER_NUMBER}"
+                )
+
             if ticket.scan_count == 0 and FLAG == 0:
-                # First entry and gate is open
                 ticket.scan_count = 1
-                CURRENT_COUNT_MANDIR = CURRENT_COUNT_MANDIR + 1
-                print("CURRENT_COUNT_MANDIR after entry:", CURRENT_COUNT_MANDIR)
+                CURRENT_COUNT_MANDIR += 1
                 message = f"✅ Entry granted for Ticket {ticket.id}"
 
             elif ticket.scan_count == 1:
-                # Exit
                 ticket.scan_count = 2
-                CURRENT_COUNT_MANDIR = max(0, CURRENT_COUNT_MANDIR - 1)
-                print("CURRENT_COUNT_MANDIR after exit:", CURRENT_COUNT_MANDIR)
+                CURRENT_COUNT_MANDIR -= 1
                 message = f"✅ Exit recorded for Ticket {ticket.id}"
 
             elif ticket.scan_count == 2:
                 message = f"❌ Ticket {ticket.id} already expired."
 
             else:
-                # scan_count == 0 but FLAG == 1  -> full / gate closed
-                message = "❌ Mandir is currently full. Please wait for some time."
-
-            # --- Recalculate gate state, send SMS if gate open/close changed ---
-            update_gate_state_and_notify()
+                message = "❌ Mandir is currently full, please wait."
 
             db.session.commit()
 
@@ -1220,88 +1172,108 @@ class ScanTicketImageResource(Resource):
             }, 200
 
         except Exception as e:
-            # Generic error fallback
             return {
                 "success": False,
                 "message": f"❌ Error processing image: {e}"
             }, 500
-        
+
 
 class ScanTicketLiveResource(Resource):
-    """
-    Expect POST JSON: { "qr_text": "<base64-or-raw-string-from-QR>" }
-    The client (browser) should decode QR and send the QR payload to this endpoint.
-    """
+
     def post(self):
-        payload = None
         try:
             data = request.get_json(force=True, silent=True) or {}
             qr_text = data.get("qr_text")
+
             if not qr_text:
                 return {"success": False, "message": "❌ No QR text provided."}, 400
 
-            # qr_text may be bytes-string or str; if it looks base64, decode it
-            decoded_str = None
+            # -------- Normalize QR text -------- #
             try:
                 if isinstance(qr_text, str):
                     qr_bytes = qr_text.encode("utf-8")
                 else:
                     qr_bytes = qr_text
 
-                # Try base64 decode first (most of your QRs contain base64-encoded dict)
                 try:
-                    decoded_str = Base64.b64decode(qr_bytes).decode("utf-8")
+                    decoded = Base64.b64decode(qr_bytes).decode("utf-8")
                 except Exception:
-                    # fallback: maybe it's already a plain string dict not base64
-                    decoded_str = qr_text if isinstance(qr_text, str) else qr_text.decode("utf-8")
-            except Exception as e:
-                return {"success": False, "message": f"❌ Failed to normalize QR text: {e}"}, 400
+                    decoded = qr_text if isinstance(qr_text, str) else qr_text.decode("utf-8")
 
-            # parse the string into python dict safely
+            except Exception as e:
+                return {"success": False, "message": f"❌ Failed to normalize QR text"}, 400
+
+            # -------- Parse JSON -------- #
             try:
-                parsed = ast.literal_eval(decoded_str)
-                passenger_id = parsed.get("passenger_id")
-                if passenger_id is None:
-                    raise ValueError("passenger_id missing in QR payload")
-            except Exception as e:
-                return {"success": False, "message": f"❌ Invalid QR payload: {e}"}, 400
+                qr_payload = json.loads(decoded)
+                metadata = qr_payload.get("metadata")
+                hash_from_qr = qr_payload.get("hash")
 
-            # retrieve ticket
-            try:
-                ticket = Passenger.query.get(int(passenger_id))
-            except Exception as e:
-                return {"success": False, "message": f"❌ Invalid passenger_id: {e}"}, 400
+                if not metadata or not hash_from_qr:
+                    return {"success": False, "message": "❌ Invalid QR format."}, 400
 
+                passenger_id = metadata.get("passenger_id")
+                if not passenger_id:
+                    return {"success": False, "message": "❌ Passenger ID missing."}, 400
+
+            except Exception:
+                return {"success": False, "message": "❌ Invalid QR payload."}, 400
+
+            # -------- Integrity check (hash) -------- #
+            metadata_json = json.dumps(
+                metadata,
+                sort_keys=True,
+                separators=(",", ":")
+            )
+            recomputed_hash = hashlib.sha256(
+                metadata_json.encode()
+            ).hexdigest()
+
+            if recomputed_hash != hash_from_qr:
+                return {
+                    "success": False,
+                    "message": "❌ QR data has been tampered."
+                }, 403
+
+            # -------- Blockchain verification -------- #
+            from blockchain.registry import verify_hash
+
+            if not verify_hash(hash_from_qr):
+                return {
+                    "success": False,
+                    "message": "❌ Ticket invalid or revoked (blockchain)."
+                }, 403
+
+            # -------- Existing DB + gate logic -------- #
+            ticket = Passenger.query.get(int(passenger_id))
             if not ticket:
                 return {"success": False, "message": "❌ Ticket not found."}, 404
 
             global CURRENT_COUNT_MANDIR
+            global MAX_COUNT_MANDIR
+            global MIN_COUNT_MADIR
             global FLAG
 
-            # ----- Crowd / scan logic -----
+            if MAX_COUNT_MANDIR == CURRENT_COUNT_MANDIR:
+                FLAG = 1
+            if MIN_COUNT_MADIR == CURRENT_COUNT_MANDIR:
+                FLAG = 0
+
             if ticket.scan_count == 0 and FLAG == 0:
-                # First entry and gate is open
                 ticket.scan_count = 1
-                CURRENT_COUNT_MANDIR = CURRENT_COUNT_MANDIR + 1
-                print("CURRENT_COUNT_MANDIR after entry:", CURRENT_COUNT_MANDIR)
-                message = f"✅ Entry granted for Ticket {ticket.id}"
+                CURRENT_COUNT_MANDIR += 1
+                message = f"✅ Entry granted for Ticket "
 
             elif ticket.scan_count == 1:
-                # Exit
                 ticket.scan_count = 2
-                CURRENT_COUNT_MANDIR = max(0, CURRENT_COUNT_MANDIR - 1)
-                print("CURRENT_COUNT_MANDIR after exit:", CURRENT_COUNT_MANDIR)
-                message = f"✅ Exit recorded for Ticket {ticket.id}"
+                CURRENT_COUNT_MANDIR -= 1
+                message = f"✅ Exit recorded for Ticket"
 
             elif ticket.scan_count == 2:
-                message = f"❌ Ticket {ticket.id} already expired."
+                message = f"❌ Ticket already expired."
 
             else:
-                # scan_count == 0 but FLAG == 1  -> full / gate closed
-                message = "❌ Mandir is currently full. Please wait for some time."
-
-            # --- Recalculate gate state, send SMS if gate open/close changed ---
-            update_gate_state_and_notify()
+                message = "❌ Mandir is currently full, please wait."
 
             db.session.commit()
 
@@ -1316,7 +1288,8 @@ class ScanTicketLiveResource(Resource):
 
         except Exception as e:
             return {"success": False, "message": f"❌ Server error: {e}"}, 500
-        
+
+
 api.add_resource(ScanTicketImageResource, '/scan-ticket/image')
 api.add_resource(ScanTicketLiveResource, '/scan-ticket/live')
 
@@ -1603,6 +1576,7 @@ class BookParking(Resource):
                 ).first()
 
                 if not exists:
+                    spot.status = 'O'
                     # Book this spot
                     res = PublicReservation(
                         lot_id=lot_id,
@@ -1648,6 +1622,7 @@ class BookParking(Resource):
                 ).first()
 
                 if not conflict:
+                    spot.status = 'O'
                     # Reserve all slots individually
                     for s in full_range:
                         r = PrivateReservation(
@@ -1713,228 +1688,66 @@ api.add_resource(MobileLoginResource, '/mobile-login')
 api.add_resource(LoginverifyotpResource, '/login-verify-otp')
 api.add_resource(ImageserverResource,'/qrcode/<string:filename>')
 api.add_resource(VerifyOtpResource, '/verify-otp')
-api.add_resource(SendOtpResource, "/send-otp")
+api.add_resource(SendOtpResource, '/send-otp')
 
-# class TwilioIVRStart(Resource):
-#     """
-#     Main IVR entry: Twilio Voice webhook -> /api/twilio/voice
-#     Configure this URL in Twilio Console for your phone number.
-#     """
-#     def post(self):
-#         resp = VoiceResponse()
+class SubSlotAllocator(Resource):
+    def post(self):
+        today = datetime.now().date()
 
-#         gather = resp.gather(
-#             num_digits=1,
-#             action="/api/twilio/menu",
-#             method="POST"
-#         )
-#         gather.say(
-#             "Jai Somnath. "
-#             "For Sugam Darshan ticket booking, press 1. "
-#             "For Sugam Aarti booking, press 2."
-#         )
+        slots = Aarti_and_DarshanSlot.query.all()
+        chunk_minutes = 20
 
-#         # If no input
-#         resp.say("Sorry, we did not receive any input. Jai Somnath. Goodbye.")
-#         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-    
-# class TwilioIVRMenu(Resource):
-#     def post(self):
-#         resp = VoiceResponse()
-#         digits = request.values.get("Digits")
+        for slot in slots:
+            passengers = Passenger.query.filter_by(
+                slot_id=slot.id,
+                darshan_date=today
+            ).order_by(Passenger.priority.desc(), Passenger.id).all()
 
-#         if digits == "1":
-#             # Go to Aadhaar capture for Darshan booking
-#             resp.redirect("/api/twilio/aadhar-darshan")
-#         elif digits == "2":
-#             resp.say("Aarti booking via phone will be available soon. Please use the mobile app or website. Jai Somnath.")
-#             resp.hangup()
-#         else:
-#             resp.say("Invalid choice.")
-#             resp.redirect("/api/twilio/voice")
+            if not passengers:
+                continue
 
-#         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+            start_dt = datetime.combine(today, slot.start_time)
+            end_dt = datetime.combine(today, slot.end_time)
 
-# class TwilioIVRAadhaarDarshan(Resource):
-#     """
-#     Ask devotee to enter 12 digit Aadhaar number.
-#     Uses the static AADHAR_MOBILE_MAP for demo.
-#     """
-#     def post(self):
-#         resp = VoiceResponse()
+            total_minutes = int((end_dt - start_dt).total_seconds() // 60)
+            num_subslots = max(1, total_minutes // chunk_minutes)
+            per_subslot = max(1, len(passengers) // num_subslots)
 
-#         gather = resp.gather(
-#             num_digits=12,
-#             action="/api/twilio/aadhar-darshan-verify",
-#             method="POST"
-#         )
-#         gather.say(
-#             "Please enter your twelve digit Aadhaar number, "
-#             "followed by the hash key."
-#         )
+            idx = 0
+            for subslot in range(num_subslots):
+                sub_start = start_dt + timedelta(minutes=subslot * chunk_minutes)
 
-#         resp.say("No input received. Restarting.")
-#         resp.redirect("/api/twilio/aadhar-darshan")
-#         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+                for _ in range(per_subslot):
+                    if idx >= len(passengers):
+                        break
 
-# class TwilioIVRAadhaarDarshanVerify(Resource):
-#     def post(self):
-#         resp = VoiceResponse()
-#         aadhar = request.values.get("Digits")
+                    passenger = passengers[idx]
 
-#         if not aadhar:
-#             resp.say("Aadhaar number not received. Please try again.")
-#             resp.redirect("/api/twilio/aadhar-darshan")
-#             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+                    # Notification time = 30min before subslot
+                    notify_time = sub_start - timedelta(minutes=14)
 
-#         mobile = AADHAR_MOBILE_MAP.get(aadhar)
-#         if not mobile:
-#             resp.say(
-#                 "This Aadhaar is not registered with Dev Dham Path. "
-#                 "Please use the app or website to register first. Jai Somnath."
-#             )
-#             resp.hangup()
-#             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+                    # Send reminder
+                    try:
+                        user = User.query.get(passenger.user_id)
+                        mobile = user.mobile_no
+                        TWILIO_SMS_CLIENT.messages.create(
+                            from_=TWILIO_SMS_NUMBER,
+                            body=f"Reminder: Your Darshan sub-slot starts at "
+                                 f"{sub_start.time().strftime('%H:%M')}. "
+                                 "Please arrive 30 minutes early.",
+                            to=f"+91{mobile}"
+                        )
+                        print(f"Notification sent to {passenger.name} for {sub_start.time()}")
+                    except Exception as e:
+                        print("WhatsApp Error:", e)
 
-#         # Aadhaar OK → ask date
-#         gather = resp.gather(
-#             num_digits=1,
-#             action=f"/api/twilio/darshan-date?aadhar={aadhar}",
-#             method="POST"
-#         )
-#         gather.say(
-#             "For today darshan, press 1. "
-#             "For tomorrow darshan, press 2."
-#         )
+                    idx += 1
 
-#         resp.say("No input received. Restarting.")
-#         resp.redirect(f"/api/twilio/darshan-date?aadhar={aadhar}")
-#         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-    
-# class TwilioIVRDarshanDate(Resource):
-#     def post(self):
-#         from datetime import date  # local import is fine
+        return {"success": True, "message": "Sub-slots allocated & reminders sent"}
+api.add_resource(SubSlotAllocator,"/allocate-subslots")
 
-#         resp = VoiceResponse()
-#         aadhar = request.args.get("aadhar")
-#         choice = request.values.get("Digits")
 
-#         if not aadhar:
-#             resp.say("Aadhaar missing. Please start again.")
-#             resp.redirect("/api/twilio/voice")
-#             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
-#         mobile_e164 = AADHAR_MOBILE_MAP.get(aadhar)
-#         if not mobile_e164:
-#             resp.say(
-#                 "This Aadhaar is not registered with Dev Dham Path. "
-#                 "Please use the app or website to register first. Jai Somnath."
-#             )
-#             resp.hangup()
-#             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-#         # Extract plain 10 digit mobile (assuming +91XXXXXXXXXX)
-#         plain_mobile = mobile_e164[-10:]
-
-#         # Check if user already exists with that mobile
-#         user = User.query.filter_by(mobile_no=plain_mobile).first()
-#         if not user:
-#             resp.say(
-#                 "Your mobile number is not registered in Dev Dham Path system. "
-#                 "Please complete registration from app or website. Jai Somnath."
-#             )
-#             resp.hangup()
-#             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-#         # Decide darshan date
-#         today = datetime.now().date()
-#         if choice == "1":
-#             darshan_date = today
-#         elif choice == "2":
-#             darshan_date = today + timedelta(days=1)
-#         else:
-#             resp.say("Invalid choice. Please try again.")
-#             resp.redirect(f"/api/twilio/darshan-date?aadhar={aadhar}")
-#             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-#         # Find first available Darshan slot
-#         slot = find_first_available_slot("Darshan", darshan_date)
-#         if not slot:
-#             resp.say(
-#                 "Sorry, there are no available darshan slots for the selected date. "
-#                 "Please try another day. Jai Somnath."
-#             )
-#             resp.hangup()
-#             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-#         # Create a minimal passenger using Aadhaar as ID
-#         passenger = Passenger(
-#             user_id=user.id,
-#             slot_id=slot.id,
-#             darshan_date=darshan_date,
-#             name=user.name or "Devotee",
-#             special=False,
-#             with_special=False,
-#             aadhaar_number=aadhar,
-#             age=0,
-#             gender="",
-#             priority=0,
-#             wheelchairneeded=False
-#         )
-#         db.session.add(passenger)
-#         db.session.flush()  # to get passenger.id
-
-#         # Generate QR and store
-#         qr_payload = str({
-#             "name": passenger.name,
-#             "passenger_id": passenger.id,
-#             "darshan_date": darshan_date.isoformat(),
-#             "slot_id": slot.id,
-#             "aadhar": aadhar,
-#             "special": False,
-#             "with_special": False,
-#             "priority": 0
-#         })
-#         qr_filename = f"ivr_passenger_{passenger.id}.png"
-#         encoded = qrgenerator(qr_payload, qr_filename)
-#         passenger.qr_code = encoded
-
-#         db.session.commit()
-
-#         # Send WhatsApp ticket to mapped mobile
-#         try:
-#             slot_type = slot.slot_type
-#             slot_text = f"{slot.start_time.strftime('%H:%M')} to {slot.end_time.strftime('%H:%M')}"
-#             TWILIO_CLIENT.messages.create(
-#                 from_=TWILIO_WHATSAPP_NUMBER,
-#                 body=(
-#                     f"{slot_type} Ticket #{passenger.id} booked for {passenger.name}.\n"
-#                     f"Date: {darshan_date.isoformat()}\n"
-#                     f"Slot: {slot_text}\n"
-#                     f"Jai Somnath - DevDhamPath"
-#                 ),
-#                 media_url=[f"{clouflare_url}/api/qrcode/{qr_filename}"],
-#                 to=f"whatsapp:{mobile_e164}"
-#             )
-#         except Exception as e:
-#             print("WhatsApp Error in IVR Darshan booking:", e)
-
-#         # Voice confirmation
-#         resp.say(
-#             f"Your Sugam Darshan ticket has been booked successfully. "
-#             f"Ticket I D {passenger.id}. "
-#             "A WhatsApp confirmation with QR code has been sent to your registered mobile number. "
-#             "Jai Somnath."
-#         )
-#         resp.hangup()
-
-#         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-    
-# api.add_resource(TwilioIVRStart, "/twilio/voice")
-# api.add_resource(TwilioIVRMenu, "/twilio/menu")
-# api.add_resource(TwilioIVRAadhaarDarshan, "/twilio/aadhar-darshan")
-# api.add_resource(TwilioIVRAadhaarDarshanVerify, "/twilio/aadhar-darshan-verify")
-# api.add_resource(TwilioIVRDarshanDate, "/twilio/darshan-date")
 
 class TwilioIVRStart(Resource):
     """
@@ -1982,9 +1795,9 @@ class TwilioIVRMenu(Resource):
             resp.redirect(f"/api/twilio/aadhar-darshan?lang={lang}")
         elif digits == "2":
             msg = (
-                "Aarti booking via phone will be available soon. Please use the app. Jai Somnath."
+                "Aarti booking via phone will be available soon. Please use the app. Radhe Radhe."
                 if lang == "en"
-                else "Phone se Aarti booking jaldi hi uplabdh hogi. Kripya app ka upyog karein. Jai Somnath."
+                else "Phone se Aarti booking jaldi hi uplabdh hogi. Kripya app ka upyog karein.Radhe Radhe."
             )
             resp.say(msg, **LANG_VOICE[lang])
             resp.say(t(lang, "goodbye"), **LANG_VOICE[lang])
@@ -2006,22 +1819,22 @@ class TwilioIVRAadhaarDarshan(Resource):
 
         gather = resp.gather(
             num_digits=12,
+            finishOnKey="#",
+            timeout = 15,
             action=f"/api/twilio/aadhar-darshan-verify?lang={lang}",
             method="POST"
         )
         gather.say(t(lang, "aadhaar_prompt"), **LANG_VOICE[lang])
 
-        resp.say(t(lang, "no_input"), **LANG_VOICE[lang])
-        resp.redirect(f"/api/twilio/aadhar-darshan?lang={lang}")
         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
     
 class TwilioIVRAadhaarDarshanVerify(Resource):
     def post(self):
         resp = VoiceResponse()
         lang = get_lang()
-        aadhar = request.values.get("Digits")
+        aadhar = (request.values.get("Digits") or "").strip()
 
-        if not aadhar:
+        if not aadhar.isdigit() or len(aadhar) != 12:
             resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
             resp.redirect(f"/api/twilio/aadhar-darshan?lang={lang}")
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
@@ -2032,204 +1845,197 @@ class TwilioIVRAadhaarDarshanVerify(Resource):
             resp.hangup()
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
+        gather = resp.gather(
+            num_digits=1,
+            finishOnKey="#",
+            timeout=15,
+            action=f"/api/twilio/darshan-date-handle?aadhar={aadhar}&lang={lang}",
+            method="POST"
+        )
+        gather.say(t(lang, "day_prompt"), **LANG_VOICE[lang])
+
+        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+class TwilioIVRDarshanDateHandle(Resource):
+    def post(self):
+        resp = VoiceResponse()
+        lang = get_lang()
+
+        aadhar = request.args.get("aadhar")
+        choice = (request.values.get("Digits") or "").strip()
+
+        # THIS is where "galat vikalp" belongs
+        if not choice.isdigit() or not (1 <= int(choice) <= 7):
+            resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
+            resp.redirect(f"/api/twilio/darshan-date-ask?aadhar={aadhar}&lang={lang}")
+            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+        darshan_date = datetime.now().date() + timedelta(days=int(choice) - 1)
+
+        resp.redirect(
+            f"/api/twilio/darshan-slot-ask?"
+            f"aadhar={aadhar}&date={darshan_date.isoformat()}&lang={lang}"
+        )
+        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+
+class TwilioIVRAadhaarDarshan(Resource):
+    """
+    Step 1: Ask devotee to enter 12-digit Aadhaar.
+    """
+    def post(self):
+        resp = VoiceResponse()
+        lang = get_lang()
+
+        gather = resp.gather(
+            num_digits=12,
+            finishOnKey="#",
+            timeout = 15,
+            action=f"/api/twilio/aadhar-darshan-verify?lang={lang}",
+            method="POST"
+        )
+        gather.say(t(lang, "aadhaar_prompt"), **LANG_VOICE[lang])
+
+        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+    
+class TwilioIVRAadhaarDarshanVerify(Resource):
+    def post(self):
+        resp = VoiceResponse()
+        lang = get_lang()
+        aadhar = (request.values.get("Digits") or "").strip()
+
+        if not aadhar.isdigit() or len(aadhar) != 12:
+            resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
+            resp.redirect(f"/api/twilio/aadhar-darshan?lang={lang}")
+            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+        mobile_e164 = AADHAR_MOBILE_MAP.get(aadhar)
+        if not mobile_e164:
+            resp.say(t(lang, "aadhaar_not_registered"), **LANG_VOICE[lang])
+            resp.redirect(f"/api/twilio/aadhar-darshan?lang={lang}")
+            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
         plain_mobile = mobile_e164[-10:]
         user = User.query.filter_by(mobile_no=plain_mobile).first()
         if not user:
             resp.say(t(lang, "mobile_not_registered"), **LANG_VOICE[lang])
-            resp.hangup()
+            resp.redirect(f"/api/twilio/aadhar-darshan?lang={lang}")
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
         gather = resp.gather(
             num_digits=1,
+            finishOnKey="#",
+            timeout=15,
             action=f"/api/twilio/darshan-date-ask?aadhar={aadhar}&lang={lang}",
             method="POST"
         )
         gather.say(t(lang, "day_prompt"), **LANG_VOICE[lang])
 
-        resp.say(t(lang, "no_input"), **LANG_VOICE[lang])
+        # fallback if no input
         resp.redirect(f"/api/twilio/darshan-date-ask?aadhar={aadhar}&lang={lang}")
-        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
+        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
 class TwilioIVRDarshanDateAsk(Resource):
     def post(self):
         resp = VoiceResponse()
         lang = get_lang()
         aadhar = request.args.get("aadhar")
-        choice = request.values.get("Digits")
-
-        if not aadhar or not choice:
-            resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
-            resp.redirect(f"/api/twilio/voice")
-            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-        try:
-            choice_int = int(choice)
-        except ValueError:
-            choice_int = 0
-
-        if choice_int < 1 or choice_int > 7:
-            resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
-            resp.redirect(f"/api/twilio/darshan-date-ask?aadhar={aadhar}&lang={lang}")
-            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-        today = datetime.now().date()
-        darshan_date = today + timedelta(days=choice_int - 1)
-        date_str = darshan_date.isoformat()
-
-        resp.redirect(f"/api/twilio/darshan-slot-ask?aadhar={aadhar}&date={date_str}&lang={lang}")
-        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-
-class TwilioIVRDarshanSlotAsk(Resource):
-    def post(self):
-        resp = VoiceResponse()
-        lang = get_lang()
-        aadhar = request.args.get("aadhar")
-        date_str = request.args.get("date")
-
-        if not aadhar or not date_str:
-            resp.say(t(lang, "internal_error"), **LANG_VOICE[lang])
-            resp.redirect("/api/twilio/voice")
-            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-        try:
-            _ = datetime.strptime(date_str, "%Y-%m-%d").date()
-        except Exception:
-            resp.say(t(lang, "internal_error"), **LANG_VOICE[lang])
-            resp.redirect("/api/twilio/voice")
-            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-        slots = get_ordered_darshan_slots()
-        if not slots:
-            resp.say(t(lang, "darshan_not_configured"), **LANG_VOICE[lang])
-            resp.hangup()
-            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-        speak_lines = []
-        option = 1
-        for s in slots:
-            start_txt = s.start_time.strftime("%I:%M %p")
-            end_txt = s.end_time.strftime("%I:%M %p")
-            if lang == "en":
-                speak_lines.append(f"For {start_txt} to {end_txt}, press {option}.")
-            else:
-                speak_lines.append(
-                    f"{start_txt} se {end_txt} ke darshan ke liye, {option} dabaiye."
-                )
-            option += 1
 
         gather = resp.gather(
             num_digits=1,
-            action=f"/api/twilio/darshan-slot-select?aadhar={aadhar}&date={date_str}&lang={lang}",
+            timeout=15,
+            action=f"/api/twilio/darshan-date-handle?aadhar={aadhar}&lang={lang}",
             method="POST"
         )
-        gather.say(
-            t(lang, "slot_intro") + " " + " ".join(speak_lines),
-            **LANG_VOICE[lang]
-        )
+        gather.say(t(lang, "day_prompt"), **LANG_VOICE[lang])
 
-        resp.say(t(lang, "no_input"), **LANG_VOICE[lang])
-        resp.redirect(f"/api/twilio/darshan-slot-ask?aadhar={aadhar}&date={date_str}&lang={lang}")
+        # fallback if no input
+        resp.redirect(f"/api/twilio/darshan-date-ask?aadhar={aadhar}&lang={lang}")
+
         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
 
 class TwilioIVRDarshanConfirm(Resource):
     """
-    Step 8: Receive wheelchair choice, then:
-    - capacity check
-    - compute special & priority
+    Final step:
+    - all data comes via query params
     - create Passenger
     - generate QR
     - send WhatsApp
-    - voice confirmation
+    - confirm via voice
     """
     def post(self):
         resp = VoiceResponse()
+        lang = get_lang()
+
+        # ---- Read params (NO Digits here) ----
         aadhar = request.args.get("aadhar")
         date_str = request.args.get("date")
         slot_id = request.args.get("slot_id")
-        gender_str = request.args.get("gender")
+        gender = request.args.get("gender")
         age_str = request.args.get("age")
-        wc_digit = request.values.get("Digits")
+        wheelchair = request.args.get("wheelchair")  # "1" or "0"
 
-        if not all([aadhar, date_str, slot_id, gender_str, age_str, wc_digit]):
-            resp.say("Missing data. Please start again.")
-            resp.redirect("/api/twilio/voice")
-            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-        # wheelchair flag
-        if wc_digit == "1":
-            wheelchair_needed = True
-        elif wc_digit == "2":
-            wheelchair_needed = False
-        else:
-            resp.say("Invalid option. Please try again.")
-            resp.redirect(
-                f"/api/twilio/darshan-wheelchair?"
-                f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}"
-                f"&gender={gender_str}"
-            )
-            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-        # parse age & date
-        try:
-            age_int = int(age_str)
-            darshan_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-            slot_id_int = int(slot_id)
-        except Exception:
-            resp.say("Internal error in data. Please try again later.")
+        if not all([aadhar, date_str, slot_id, gender, age_str, wheelchair]):
+            resp.say(t(lang, "internal_error"), **LANG_VOICE[lang])
             resp.hangup()
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
-        # Aadhaar -> mobile -> user
+        wheelchair_needed = (wheelchair == "1")
+
+        # ---- Parse values ----
+        try:
+            age = int(age_str)
+            darshan_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            slot_id = int(slot_id)
+        except Exception:
+            resp.say(t(lang, "internal_error"), **LANG_VOICE[lang])
+            resp.hangup()
+            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+        # ---- Aadhaar → user ----
         mobile_e164 = AADHAR_MOBILE_MAP.get(aadhar)
         if not mobile_e164:
-            resp.say("Aadhaar not registered with DevDhamPath. Jai Somnath.")
+            resp.say(t(lang, "aadhaar_not_registered"), **LANG_VOICE[lang])
             resp.hangup()
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
-        plain_mobile = mobile_e164[-10:]
-        user = User.query.filter_by(mobile_no=plain_mobile).first()
+        user = User.query.filter_by(mobile_no=mobile_e164[-10:]).first()
         if not user:
-            resp.say("Mobile not registered as user. Please use app to register. Jai Somnath.")
+            resp.say(t(lang, "mobile_not_registered"), **LANG_VOICE[lang])
             resp.hangup()
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
-        slot = Aarti_and_DarshanSlot.query.get(slot_id_int)
+        # ---- Slot ----
+        slot = Aarti_and_DarshanSlot.query.get(slot_id)
         if not slot:
-            resp.say("Selected slot is not available. Please try again.")
-            resp.redirect(f"/api/twilio/darshan-slot-ask?aadhar={aadhar}&date={date_str}")
+            resp.say(t(lang, "internal_error"), **LANG_VOICE[lang])
+            resp.hangup()
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
-        # Capacity check
-        booked_count = Passenger.query.filter_by(
+        # ---- Capacity ----
+        if Passenger.query.filter_by(
             slot_id=slot.id,
             darshan_date=darshan_date
-        ).count()
-        if booked_count >= slot.max_visitors:
-            resp.say(
-                "Sorry, this slot is already full. "
-                "Please select a different slot."
-            )
-            resp.redirect(f"/api/twilio/darshan-slot-ask?aadhar={aadhar}&date={date_str}")
+        ).count() >= slot.max_visitors:
+            resp.say(t(lang, "slot_full"), **LANG_VOICE[lang])
+            resp.hangup()
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
-        # Compute special + priority like tumhaara normal logic
-        is_special = False
+        # ---- Priority ----
+        special = False
         priority = 0
 
-        if age_int >= 60:
-            is_special = True
-            if 60 <= age_int < 70:
-                priority += 1
-            else:  # 70+
-                priority += 2
+        if age >= 60:
+            special = True
+            priority += 2 if age >= 70 else 1
 
         if wheelchair_needed:
-            is_special = True
+            special = True
             priority += 4
 
-        # Create Passenger
+        # ---- Create Passenger ----
         passenger = Passenger(
             user_id=user.id,
             slot_id=slot.id,
@@ -2238,63 +2044,76 @@ class TwilioIVRDarshanConfirm(Resource):
             aadhaar_number=aadhar,
             qr_code=None,
             scan_count=0,
-            special=is_special,
+            special=special,
             with_special=False,
-            age=age_int,
-            gender=gender_str,
+            age=age,
+            gender=gender,
             priority=priority,
             wheelchairneeded=wheelchair_needed
         )
-        db.session.add(passenger)
-        db.session.flush()  # get ID
 
-        # QR payload
-        qr_payload = str({
+        db.session.add(passenger)
+        db.session.flush()
+
+        # ---- QR ----
+        metadata = {
             "name": passenger.name,
             "passenger_id": passenger.id,
-            "darshan_date": darshan_date.isoformat(),
+            "darshan_date": str(darshan_date),
             "slot_id": slot.id,
             "aadhar": aadhar,
-            "special": is_special,
-            "with_special": False,
-            "priority": priority,
-            "age": age_int,
-            "gender": gender_str,
-            "wheelchairneeded": wheelchair_needed
-        })
+            "priority": priority
+        }
+
+        # canonical JSON (MUST match scan logic)
+        metadata_json = json.dumps(
+            metadata,
+            sort_keys=True,
+            separators=(",", ":")
+        )
+
+        # hash
+        credential_hash = hashlib.sha256(
+            metadata_json.encode()
+        ).hexdigest()
+
+        # 🔥 ISSUE ON BLOCKCHAIN (THIS IS THE KEY LINE)
+        issue_hash(credential_hash)
+
+        # QR payload
+        qr_payload = {
+            "metadata": metadata,
+            "hash": credential_hash
+        }
+
+        qr_data = json.dumps(qr_payload, separators=(",", ":"))
+
         qr_filename = f"ivr_passenger_{passenger.id}.png"
-        encoded = qrgenerator(qr_payload, qr_filename)
-        passenger.qr_code = encoded
+        passenger.qr_code = qrgenerator(qr_data, qr_filename)
 
         db.session.commit()
 
-        # WhatsApp ticket
+        # ---- WhatsApp (best effort) ----
         try:
-            slot_text = f"{slot.start_time.strftime('%I:%M %p')} - {slot.end_time.strftime('%I:%M %p')}"
             TWILIO_CLIENT.messages.create(
                 from_=TWILIO_WHATSAPP_NUMBER,
+                to=f"whatsapp:{mobile_e164}",
                 body=(
                     f"Sugam Darshan Ticket #{passenger.id}\n"
-                    f"Name: {passenger.name}\n"
-                    f"Date: {darshan_date.isoformat()}\n"
-                    f"Slot: {slot_text}\n"
-                    f"Age: {age_int}, Gender: {gender_str}\n"
-                    f"Wheelchair: {'Yes' if wheelchair_needed else 'No'}\n"
-                    f"Jai Somnath - DevDhamPath"
+                    f"Date: {darshan_date}\n"
+                    f"Slot: {slot.start_time.strftime('%I:%M %p')} - "
+                    f"{slot.end_time.strftime('%I:%M %p')}\n"
+                    f"Radhe Radhe"
                 ),
-                media_url=[f"{clouflare_url}/api/qrcode/{qr_filename}"],
-                to=f"whatsapp:{mobile_e164}"
+                media_url=[f"{clouflare_url}/api/qrcode/{qr_filename}"]
             )
         except Exception as e:
-            print("WhatsApp Error in IVR booking:", e)
+            print("WhatsApp error:", e)
 
-        resp.say(
-            f"Your Sugam Darshan ticket has been booked successfully. "
-            f"Ticket I D {passenger.id}. "
-            "A WhatsApp confirmation with Q R code has been sent to your registered mobile number. "
-            "Jai Somnath."
-        )
+        # ---- Voice confirm ----
+        resp.say(t(lang, "booking_confirm"), **LANG_VOICE[lang])
         resp.hangup()
+
         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
 
@@ -2302,13 +2121,15 @@ class TwilioIVRDarshanSlotSelect(Resource):
     def post(self):
         resp = VoiceResponse()
         lang = get_lang()
+
         aadhar = request.args.get("aadhar")
         date_str = request.args.get("date")
-        choice = request.values.get("Digits")
+        digit = (request.values.get("Digits") or "").strip()
 
-        if not aadhar or not date_str or not choice:
-            resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
-            resp.redirect(f"/api/twilio/darshan-slot-ask?aadhar={aadhar}&date={date_str}&lang={lang}")
+        # ---- basic sanity ----
+        if not aadhar or not date_str:
+            resp.say(t(lang, "internal_error"), **LANG_VOICE[lang])
+            resp.redirect("/api/twilio/voice")
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
         slots = get_ordered_darshan_slots()
@@ -2317,92 +2138,98 @@ class TwilioIVRDarshanSlotSelect(Resource):
             resp.hangup()
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
-        try:
-            idx = int(choice) - 1
-        except ValueError:
-            idx = -1
+        # ---- validate input ----
+        if not digit.isdigit():
+            resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
+            resp.redirect(
+                f"/api/twilio/darshan-slot-ask?"
+                f"aadhar={aadhar}&date={date_str}&lang={lang}"
+            )
+            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
+        idx = int(digit) - 1
         if idx < 0 or idx >= len(slots):
             resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
-            resp.redirect(f"/api/twilio/darshan-slot-ask?aadhar={aadhar}&date={date_str}&lang={lang}")
+            resp.redirect(
+                f"/api/twilio/darshan-slot-ask?"
+                f"aadhar={aadhar}&date={date_str}&lang={lang}"
+            )
             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
         slot = slots[idx]
+
+        # ---- NEXT STEP: GENDER ASK (NOT HANDLE) ----
         resp.redirect(
-            f"/api/twilio/darshan-gender?aadhar={aadhar}&date={date_str}&slot_id={slot.id}&lang={lang}"
+            f"/api/twilio/darshan-gender-ask?"
+            f"aadhar={aadhar}"
+            f"&date={date_str}"
+            f"&slot_id={slot.id}"
+            f"&lang={lang}"
         )
+
         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
         
-class TwilioIVRDarshanGender(Resource):
-    def post(self):
-        resp = VoiceResponse()
-        lang = get_lang()
-        aadhar = request.args.get("aadhar")
-        date_str = request.args.get("date")
-        slot_id = request.args.get("slot_id")
+# class TwilioIVRDarshanGender(Resource):
+#     def post(self):
+#         resp = VoiceResponse()
+#         lang = get_lang()
 
-        if not aadhar or not date_str or not slot_id:
-            resp.say(t(lang, "internal_error"), **LANG_VOICE[lang])
-            resp.redirect("/api/twilio/voice")
-            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+#         aadhar = request.args.get("aadhar")
+#         date_str = request.args.get("date")
+#         slot_id = request.args.get("slot_id")
+#         digit = (request.values.get("Digits") or "").strip()
 
-        gather = resp.gather(
-            num_digits=1,
-            action=f"/api/twilio/darshan-age?aadhar={aadhar}&date={date_str}&slot_id={slot_id}&lang={lang}",
-            method="POST"
-        )
-        gather.say(t(lang, "gender_prompt"), **LANG_VOICE[lang])
+#         if digit == "1":
+#             gender = "Male"
+#         elif digit == "2":
+#             gender = "Female"
+#         elif digit == "3":
+#             gender = "Other"
+#         else:
+#             resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
+#             resp.redirect(
+#                 f"/api/twilio/darshan-gender?"
+#                 f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}&lang={lang}"
+#             )
+#             return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
-        resp.say(t(lang, "no_input"), **LANG_VOICE[lang])
-        resp.redirect(f"/api/twilio/darshan-gender?aadhar={aadhar}&date={date_str}&slot_id={slot_id}&lang={lang}")
-        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+#         resp.redirect(
+#             f"/api/twilio/darshan-age?"
+#             f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}"
+#             f"&gender={gender}&lang={lang}"
+#         )
+#         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
 
 class TwilioIVRDarshanAge(Resource):
-    """
-    Step 6: Receive gender digit, then ask for age (2 digits).
-    """
     def post(self):
         resp = VoiceResponse()
+        lang = get_lang()
+
         aadhar = request.args.get("aadhar")
         date_str = request.args.get("date")
         slot_id = request.args.get("slot_id")
-        gender_digit = request.values.get("Digits")
+        gender = request.args.get("gender")
 
-        if not aadhar or not date_str or not slot_id or not gender_digit:
-            resp.say("Invalid input. Please try again.")
-            resp.redirect("/api/twilio/voice")
-            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-        if gender_digit == "1":
-            gender_str = "Male"
-        elif gender_digit == "2":
-            gender_str = "Female"
-        elif gender_digit == "3":
-            gender_str = "Other"
-        else:
-            resp.say("Invalid gender option. Please try again.")
-            resp.redirect(f"/api/twilio/darshan-gender?aadhar={aadhar}&date={date_str}&slot_id={slot_id}")
-            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
-
-        # Ask for age
         gather = resp.gather(
             num_digits=2,
+            finishOnKey="#",
+            timeout=15,
             action=(
-                f"/api/twilio/darshan-wheelchair?"
-                f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}&gender={gender_str}"
+                f"/api/twilio/darshan-wheelchair-ask?"
+                f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}"
+                f"&gender={gender}&lang={lang}"
             ),
             method="POST"
         )
-        gather.say(
-            "Please enter age in years using two digits. "
-            "For example, for twenty five, press 2 and 5."
+        gather.say(t(lang, "age_prompt"), **LANG_VOICE[lang])
+
+        resp.redirect(
+            f"/api/twilio/darshan-age?"
+            f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}"
+            f"&gender={gender}&lang={lang}"
         )
 
-        resp.say("No input received. Restarting.")
-        resp.redirect(
-            f"/api/twilio/darshan-age?aadhar={aadhar}&date={date_str}&slot_id={slot_id}"
-        )
         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
     
 class TwilioIVRDarshanWheelchair(Resource):
@@ -2468,24 +2295,24 @@ PROMPTS = {
             "For English, press 2."
         ),
         "main_menu": (
-            "Jai Somnath. "
+            "Radhe Radhe. "
             "For Sugam Darshan ticket booking, press 1. "
             "For Sugam Aarti booking, press 2."
         ),
         "invalid_choice": "Invalid choice.",
         "no_input": "No input received. Restarting.",
-        "goodbye": "Jai Somnath. Goodbye.",
+        "goodbye": "Radhe Radhe. Goodbye.",
         "aadhaar_prompt": (
             "Please enter your twelve digit Aadhaar number, "
             "followed by the hash key."
         ),
         "aadhaar_not_registered": (
             "This Aadhaar is not registered with Dev Dham Path. "
-            "Please register from the app or website. Jai Somnath."
+            "Please register from the app or website. Radhe Radhe."
         ),
         "mobile_not_registered": (
             "Your mobile number is not registered as a user. "
-            "Please complete registration from the app. Jai Somnath."
+            "Please complete registration from the app. Radhe Radhe."
         ),
         "day_prompt": (
             "Please choose your darshan day. "
@@ -2518,12 +2345,12 @@ PROMPTS = {
         ),
         "internal_error": "Internal error. Please try again later.",
         "darshan_not_configured": (
-            "Darshan timings are not configured. Please try later. Jai Somnath."
+            "Darshan timings are not configured. Please try later. Radhe Radhe."
         ),
         "booking_confirm": (
             "Your Sugam Darshan ticket has been booked successfully. "
             "A WhatsApp confirmation with QR code has been sent to your registered mobile number. "
-            "Jai Somnath."
+            "Radhe Radhe."
         ),
     },
     "hi": {
@@ -2533,24 +2360,24 @@ PROMPTS = {
             "Angrezi ke liye 2 dabaiye."
         ),
         "main_menu": (
-            "Jai Somnath. "
+            "Radhe Radhe. "
             "Sugam Darshan ticket booking ke liye 1 dabaiye. "
             "Sugam Aarti booking ke liye 2 dabaiye."
         ),
         "invalid_choice": "Galat vikalp hai.",
         "no_input": "Koi input nahi mila. Phir se koshish karte hain.",
-        "goodbye": "Jai Somnath. Dhanyavaad.",
+        "goodbye": "Radhe Radhe. Dhanyavaad.",
         "aadhaar_prompt": (
             "Kripya apna baarah ank ka Aadhar number darj karein "
             "aur hash key dabayein."
         ),
         "aadhaar_not_registered": (
             "Yeh Aadhar Dev Dham Path par registered nahi hai. "
-            "Kripya app ya website se registration karein. Jai Somnath."
+            "Kripya app ya website se registration karein. Radhe Radhe."
         ),
         "mobile_not_registered": (
             "Aapka mobile number system mein registered nahi hai. "
-            "Kripya app se registration poora karein. Jai Somnath."
+            "Kripya app se registration poora karein. Radhe Radhe."
         ),
         "day_prompt": (
             "Kripya apni darshan ki tithi chunen. "
@@ -2584,12 +2411,12 @@ PROMPTS = {
         "internal_error": "System mein kuch dikkat hai. Kripya baad mein koshish karein.",
         "darshan_not_configured": (
             "Darshan ke samay set nahi kiye gaye hain. "
-            "Kripya baad mein koshish karein. Jai Somnath."
+            "Kripya baad mein koshish karein. Radhe Radhe."
         ),
         "booking_confirm": (
             "Aapka Sugam Darshan ticket safal roop se buk ho gaya hai. "
             "QR code ke saath WhatsApp par pushti sandesh bhej diya gaya hai. "
-            "Jai Somnath."
+            "Radhe Radhe."
         ),
     },
 }
@@ -2625,6 +2452,164 @@ class TwilioIVRLanguageSelect(Resource):
 
         resp.redirect(f"/api/twilio/menu?lang={lang}")
         return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+    
+class TwilioIVRDarshanSlotAsk(Resource):
+    def post(self):
+        resp = VoiceResponse()
+        lang = get_lang()
+
+        aadhar = request.args.get("aadhar")
+        date_str = request.args.get("date")
+
+        slots = get_ordered_darshan_slots()
+        if not slots:
+            resp.say(t(lang, "darshan_not_configured"), **LANG_VOICE[lang])
+            resp.hangup()
+            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+        lines = []
+        for i, s in enumerate(slots, start=1):
+            start = s.start_time.strftime("%I:%M %p")
+            end = s.end_time.strftime("%I:%M %p")
+            if lang == "hi":
+                lines.append(f"{start} se {end} ke liye {i} dabaiye.")
+            else:
+                lines.append(f"For {start} to {end}, press {i}.")
+
+        gather = resp.gather(
+            num_digits=1,
+            timeout=15,
+            action=(
+                f"/api/twilio/darshan-slot-select?"
+                f"aadhar={aadhar}&date={date_str}&lang={lang}"
+            ),
+            method="POST"
+        )
+        gather.say(t(lang, "slot_intro") + " " + " ".join(lines), **LANG_VOICE[lang])
+
+        # fallback ONLY to ASK
+        resp.redirect(
+            f"/api/twilio/darshan-slot-ask?"
+            f"aadhar={aadhar}&date={date_str}&lang={lang}"
+        )
+
+        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+class TwilioIVRDarshanWheelchairAsk(Resource):
+    def post(self):
+        resp = VoiceResponse()
+        lang = get_lang()
+
+        aadhar = request.args.get("aadhar")
+        date_str = request.args.get("date")
+        slot_id = request.args.get("slot_id")
+        gender = request.args.get("gender")
+        age = (request.values.get("Digits") or "").strip()
+
+        if not age.isdigit() or not (1 <= int(age) <= 120):
+            resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
+            resp.redirect(
+                f"/api/twilio/darshan-age?"
+                f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}"
+                f"&gender={gender}&lang={lang}"
+            )
+            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+        gather = resp.gather(
+            num_digits=1,
+            finishOnKey="#",
+            timeout=15,
+            action=(
+                f"/api/twilio/darshan-wheelchair-handle?"
+                f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}"
+                f"&gender={gender}&age={age}&lang={lang}"
+            ),
+            method="POST"
+        )
+        gather.say(t(lang, "wheelchair_prompt"), **LANG_VOICE[lang])
+
+        resp.redirect(
+            f"/api/twilio/darshan-wheelchair-ask?"
+            f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}"
+            f"&gender={gender}&lang={lang}"
+        )
+
+        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+class TwilioIVRDarshanWheelchairHandle(Resource):
+    def post(self):
+        resp = VoiceResponse()
+        wc = (request.values.get("Digits") or "").strip()
+
+        if wc not in ("1", "2"):
+            resp.say("Invalid choice.")
+            resp.redirect(request.url)
+            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+        resp.redirect(
+            f"/api/twilio/darshan-confirm?"
+            f"{request.query_string.decode()}&wheelchair={wc}"
+        )
+        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+class TwilioIVRDarshanGenderAsk(Resource):
+    def post(self):
+        resp = VoiceResponse()
+        lang = get_lang()
+
+        aadhar = request.args.get("aadhar")
+        date_str = request.args.get("date")
+        slot_id = request.args.get("slot_id")
+
+        gather = resp.gather(
+            num_digits=1,
+            timeout=15,
+            action=(
+                f"/api/twilio/darshan-gender-handle?"
+                f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}&lang={lang}"
+            ),
+            method="POST"
+        )
+        gather.say(t(lang, "gender_prompt"), **LANG_VOICE[lang])
+
+        # fallback ONLY to ASK
+        resp.redirect(
+            f"/api/twilio/darshan-gender-ask?"
+            f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}&lang={lang}"
+        )
+
+        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+class TwilioIVRDarshanGenderHandle(Resource):
+    def post(self):
+        resp = VoiceResponse()
+        lang = get_lang()
+
+        aadhar = request.args.get("aadhar")
+        date_str = request.args.get("date")
+        slot_id = request.args.get("slot_id")
+        digit = (request.values.get("Digits") or "").strip()
+
+        if digit == "1":
+            gender = "Male"
+        elif digit == "2":
+            gender = "Female"
+        elif digit == "3":
+            gender = "Other"
+        else:
+            resp.say(t(lang, "invalid_choice"), **LANG_VOICE[lang])
+            resp.redirect(
+                f"/api/twilio/darshan-gender-ask?"
+                f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}&lang={lang}"
+            )
+            return make_response(str(resp), 200, {"Content-Type": "text/xml"})
+
+        resp.redirect(
+            f"/api/twilio/darshan-age?"
+            f"aadhar={aadhar}&date={date_str}&slot_id={slot_id}"
+            f"&gender={gender}&lang={lang}"
+        )
+        return make_response(str(resp), 200, {"Content-Type": "text/xml"})
 
     
 api.add_resource(TwilioIVRStart, "/twilio/voice")
@@ -2635,110 +2620,284 @@ api.add_resource(TwilioIVRAadhaarDarshanVerify, "/twilio/aadhar-darshan-verify")
 api.add_resource(TwilioIVRDarshanDateAsk, "/twilio/darshan-date-ask")
 api.add_resource(TwilioIVRDarshanSlotAsk, "/twilio/darshan-slot-ask")
 api.add_resource(TwilioIVRDarshanSlotSelect, "/twilio/darshan-slot-select")
-api.add_resource(TwilioIVRDarshanGender, "/twilio/darshan-gender")
 api.add_resource(TwilioIVRDarshanAge, "/twilio/darshan-age")
 api.add_resource(TwilioIVRDarshanWheelchair, "/twilio/darshan-wheelchair")
 api.add_resource(TwilioIVRDarshanConfirm, "/twilio/darshan-confirm")
+api.add_resource(TwilioIVRDarshanDateHandle, "/twilio/darshan-date-handle")
+api.add_resource(TwilioIVRDarshanWheelchairAsk, "/twilio/darshan-wheelchair-ask")
+api.add_resource(TwilioIVRDarshanWheelchairHandle, "/twilio/darshan-wheelchair-handle")
+api.add_resource(TwilioIVRDarshanGenderAsk, "/twilio/darshan-gender-ask")
+api.add_resource(TwilioIVRDarshanGenderHandle, "/twilio/darshan-gender-handle")
 
-# Initialize properly (two args)
-if SMS_SID and SMS_TOKEN:
-    SMS_CLIENT = Client(SMS_SID, SMS_TOKEN)
-else:
-    SMS_CLIENT = None
-    print("[SMS INIT] WARNING: SMS client not initialized. Check SMS_SID/SMS_TOKEN.")
 
-def send_sms(to_number: str, body: str):
+
+
+
+emergency_bp = Blueprint('emergency', __name__, url_prefix='/api/emergency')
+
+# In-memory queue (no DB)
+# Only last 100 alerts kept in memory
+ALERT_BUFFER = deque(maxlen=100)
+
+# Temple geo-fence config
+TEMPLE_LAT = 20.8880
+TEMPLE_LNG = 50.4012
+MAX_RADIUS = 500  # meters
+
+
+def calculate_distance(lat1, lon1, lat2, lon2):
+    R = 6371000  # Earth radius in meters
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c
+
+
+def make_alert_from_payload(data, *, location=None, inside_geofence=None, distance_m=None):
     """
-    Send a plain SMS using SMS_CLIENT.
-    - Expects 'to_number' and SMS_NUMBER to be in E.164 format (eg '+919876543210').
-    - If you use a Messaging Service SID, pass it via messaging_service_sid instead of from_.
+    Build the alert dict that will be stored in ALERT_BUFFER.
+    Now also includes `emergency_type` so Admin UI can display it.
     """
-    global SMS_CLIENT, SMS_NUMBER
+    if location is None:
+        location = (data.get('location') or {}) or {}
 
-    if not SMS_CLIENT:
-        print("[SMS ERROR] SMS_CLIENT not initialized (missing SID/TOKEN)")
+    # 🔴 Support both `timestamp` and `timestamp_utc` from frontend
+    ts = None
+    if data.get('timestamp_utc'):
+        try:
+            ts = datetime.fromisoformat(
+                data['timestamp_utc'].replace('Z', '+00:00')
+            )
+        except Exception:
+            ts = None
+
+    if ts is None and data.get('timestamp'):
+        try:
+            ts = datetime.fromisoformat(
+                data['timestamp'].replace('Z', '+00:00')
+            )
+        except Exception:
+            ts = None
+
+    if ts is None:
+        ts = datetime.now(timezone.utc)
+
+    ts_utc = ts.astimezone(timezone.utc)
+
+    # ✅ Read emergency_type from payload
+    emergency_type = (
+        data.get("emergency_type")
+        or data.get("type")
+        or data.get("sos_type")
+    )
+
+    return {
+        "id": str(uuid.uuid4()),
+        "user_id": data.get("user_id"),
+        "user_name": data.get("user_name"),
+        "latitude": location.get("latitude"),
+        "longitude": location.get("longitude"),
+        "accuracy": location.get("accuracy"),
+        "timestamp_utc": ts_utc.isoformat(),
+        "current_page": data.get("current_page"),
+        "status": data.get("status") or "PENDING",
+        "received_at": datetime.now(timezone.utc).isoformat(),
+        "inside_geofence": inside_geofence,
+        "distance_m": distance_m,
+        # 👇 NEW FIELD – this is what Admin/Guard dashboards use
+        "emergency_type": emergency_type,
+    }
+
+
+@emergency_bp.route('/trigger', methods=['POST'])
+def trigger_emergency():
+    try:
+        data = request.get_json() or {}
+
+        # ✅ Support BOTH formats from frontend:
+        # 1) { location: { latitude, longitude } }
+        # 2) { latitude, longitude }
+        loc = (data.get('location') or {}) or {}
+        raw_lat = loc.get('latitude', data.get('latitude'))
+        raw_lng = loc.get('longitude', data.get('longitude'))
+
+        # Default: assume no location / no geofence
+        inside = None
+        distance = None
+        clean_location = {
+            "latitude": None,
+            "longitude": None,
+            "accuracy": None,
+        }
+
+        if raw_lat is not None and raw_lng is not None:
+            try:
+                lat = float(raw_lat)
+                lng = float(raw_lng)
+
+                distance = calculate_distance(lat, lng, TEMPLE_LAT, TEMPLE_LNG)
+                inside = distance <= MAX_RADIUS
+
+                clean_location = {
+                    "latitude": lat,
+                    "longitude": lng,
+                    "accuracy": loc.get("accuracy"),
+                }
+            except (TypeError, ValueError):
+                print("❌ Invalid latitude/longitude in SOS payload:", raw_lat, raw_lng)
+
+        # ⚠️ Make sure `emergency_type` from frontend is passed through as-is
+        # (it's already in `data`, so make_alert_from_payload will pick it up)
+        alert = make_alert_from_payload(
+            data,
+            location=clean_location,
+            inside_geofence=inside,
+            distance_m=distance,
+        )
+
+        ALERT_BUFFER.appendleft(alert)
+
+        print("🚨 NEW EMERGENCY ALERT:", alert)
+
+        return jsonify({
+            "success": True,
+            "message": "SOS received",
+            "alert_id": alert["id"],
+            "inside_geofence": inside,
+            "distance_m": distance,
+        }), 201
+
+    except Exception as e:
+        print("❌ Error in /api/emergency/trigger:", repr(e))
+        return jsonify({
+            "success": False,
+            "message": "Internal server error in SOS trigger",
+            "error": str(e),
+        }), 500
+
+@emergency_bp.route('/triggerforces',methods=['POST'])
+def force_emergency():
+    data= request.get_json()
+    emergency=data.get("emergency_type")
+    message = TWILIO_SMS_CLIENT.messages.create(
+                from_=TWILIO_SMS_NUMBER,
+                body=emergency,
+                to=POLICE_NUMBER,)
+    return jsonify({"success": True, "message": "Force SOS sent to police"}), 201
+@emergency_bp.route('/admin/alerts', methods=['GET'])
+def get_emergency_alerts():
+    """
+    Admin dashboard uses this.
+    We just dump ALERT_BUFFER – each alert now includes `emergency_type`.
+    """
+    return jsonify(list(ALERT_BUFFER))
+
+
+@emergency_bp.route('/clear', methods=['POST'])
+def clear_sos_alerts():
+    ALERT_BUFFER.clear()
+    print("⚠️ All SOS alerts cleared from memory")
+    return jsonify({"success": True, "message": "All SOS alerts cleared"})
+
+
+@emergency_bp.route('/send-to-security', methods=['POST'])
+def send_to_security():
+    """
+    Admin clicks 'Send to Security Officer'
+    -> mark alert as IN_PROGRESS in the in-memory buffer.
+    -> send SMS to security officer via Twilio.
+    """
+    data = request.get_json() or {}
+    alert_id = data.get("alert_id")
+
+    if not alert_id:
+        return jsonify({"success": False, "message": "alert_id is required"}), 400
+
+    alert_id = str(alert_id)
+
+    for alert in ALERT_BUFFER:
+        if str(alert.get("id")) == alert_id:
+            alert["status"] = "IN_PROGRESS"
+            alert["sent_to_security_at"] = datetime.now(timezone.utc).isoformat()
+            print("📨 Alert sent to security:", alert)
+
+            # 🔔 NEW: fire Twilio SMS here
+            send_sms_to_security(alert)
+
+            return jsonify({"success": True, "alert": alert}), 200
+
+    return jsonify({"success": False, "message": "Alert not found"}), 404
+
+@emergency_bp.route('/security/alerts', methods=['GET'])
+def get_security_alerts():
+    """
+    Security dashboard polls this.
+    Return only alerts that are sent to security (IN_PROGRESS).
+    """
+    security_alerts = [
+        alert for alert in ALERT_BUFFER
+        if alert.get("status") == "IN_PROGRESS"
+    ]
+    return jsonify(security_alerts), 200
+
+def send_sms_to_security(alert: dict):
+    if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_SMS_NUMBER, SECURITY_OFFICER_NUMBER]):
+        print("⚠️ Twilio env variables not set. Skipping SMS send.")
         return
-
-    if not SMS_NUMBER:
-        print("[SMS ERROR] SMS_NUMBER not configured")
-        return
-
-    # Ensure to_number is E.164. If it's missing '+' and country code, try to fix for India:
-    if not to_number.startswith("+"):
-        # optional: automatically prepend +91 if numeric and len ==10
-        if to_number.isdigit() and len(to_number) == 10:
-            to_number = "+91" + to_number
-            print("[SMS] Normalized recipient to", to_number)
-        else:
-            print("[SMS ERROR] to_number not in E.164 and not fixable:", to_number)
-            return
 
     try:
-        msg = SMS_CLIENT.messages.create(
-            from_=SMS_NUMBER,   # must be Twilio number in E.164 or use messaging_service_sid=
-            to=to_number,
-            body=body
+
+        emergency_type = alert.get("emergency_type") or "Unknown"
+        user_name = alert.get("user_name") or "Unknown Devotee"
+        user_id = alert.get("user_id") or "N/A"
+
+        lat = alert.get("latitude")
+        lng = alert.get("longitude")
+
+        if lat and lng:
+            location_text = f"Location: {lat:.5f}, {lng:.5f}"
+        else:
+            location_text = "Location: Not available"
+
+        body = (
+            "🚨 TEMPLE SOS ALERT 🚨\n"
+            f"Type: {emergency_type}\n"
+            f"Devotee: {user_name} (ID: {user_id})\n"
+            f"{location_text}\n"
+            "Please check the security console for full details."
         )
-        print("[SMS SENT]", to_number, "sid=", getattr(msg, "sid", None))
+
+        message = TWILIO_SMS_CLIENT.messages.create(
+            from_=TWILIO_SMS_NUMBER,
+            body=body,
+            to=SECURITY_OFFICER_NUMBER,
+        )
+
+        print("✅ Twilio SMS sent to security officer. SID:", message.sid)
+
     except Exception as e:
-        # Log full exception for debug
-        print("[SMS ERROR] Failed sending to", to_number, ":", repr(e))
+        print("❌ Failed to send Twilio SMS to security officer:", repr(e))
 
-
-def notify_gate_closed():
+@emergency_bp.route('/resolve', methods=['POST'])
+def resolve_alert():
     """
-    Called when gate goes from OPEN -> CLOSED.
+    Security guard clicks 'Acknowledge'
+    -> mark alert as RESOLVED.
     """
-    security_msg = (
-        "ALERT: Entry gate CLOSED. Mandir crowd at maximum capacity. "
-        "Please manage the hall and control queues."
-    )
-    bus_msg = (
-        "ALERT: Entry gate CLOSED. Please temporarily stop shuttle buses "
-        "from bringing more devotees until further notice."
-    )
+    data = request.get_json() or {}
+    alert_id = data.get("alert_id")
 
-    send_sms(SECURITY_OFFICER, security_msg)
-    send_sms(SHUTTLE_BUS, bus_msg)
+    if not alert_id:
+        return jsonify({"success": False, "message": "alert_id is required"}), 400
 
+    alert_id = str(alert_id)
 
-def notify_gate_opened():
-    """
-    Called when gate goes from CLOSED -> OPEN.
-    """
-    security_msg = (
-        "UPDATE: Mandir crowd is now under control. Entry gate OPEN. "
-        "Resume normal crowd flow."
-    )
-    bus_msg = (
-        "UPDATE: Entry gate OPEN. You can resume normal shuttle bus operations."
-    )
+    for alert in ALERT_BUFFER:
+        if str(alert.get("id")) == alert_id:
+            alert["status"] = "RESOLVED"
+            alert["resolved_at"] = datetime.now(timezone.utc).isoformat()
+            print("✅ Alert resolved by security:", alert)
+            return jsonify({"success": True, "alert": alert}), 200
 
-    send_sms(SECURITY_OFFICER, security_msg)
-    send_sms(SHUTTLE_BUS, bus_msg)
-
-def update_gate_state_and_notify():
-    """
-    Recalculate gate state (FLAG) from CURRENT_COUNT_MANDIR
-    and send SMS when it flips OPEN <-> CLOSED.
-
-    FLAG: 0 = OPEN, 1 = CLOSED
-    """
-    global CURRENT_COUNT_MANDIR, MAX_COUNT_MANDIR, MIN_COUNT_MADIR, FLAG
-
-    previous_flag = FLAG
-
-    # Recalculate based on current crowd count
-    if CURRENT_COUNT_MANDIR >= MAX_COUNT_MANDIR:
-        FLAG = 1    # gate closed
-    elif CURRENT_COUNT_MANDIR <= MIN_COUNT_MADIR:
-        FLAG = 0    # gate open
-
-    # If state changed, send appropriate SMS
-    if previous_flag == 0 and FLAG == 1:
-        print("[GATE STATE] OPEN -> CLOSED")
-        notify_gate_closed()
-
-    elif previous_flag == 1 and FLAG == 0:
-        print("[GATE STATE] CLOSED -> OPEN")
-        notify_gate_opened()
+    return jsonify({"success": False, "message": "Alert not found"}), 404
