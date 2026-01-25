@@ -5,16 +5,20 @@ instance/
 # Python cache files
 __pycache__/
 *.pyc
-
+instance/
 # Node modules for frontend
 node_modules/
 dist/
 
 # Environment files
-#.env
-
+venv/
+.env
+static/qrcode/
+backend/static/qrcode/
 # VS Code settings
 .vscode/
-
+instance/
 # MacOS files
 .DS_Store
+
+templates/
