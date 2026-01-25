@@ -80,20 +80,20 @@ Planned developments include:
 
 ### 💻 Software & Experience
 - Full migration to a Vue.js frontend with REST APIs.
-- Development of a Flutter mobile app for pilgrims with QR, maps, and booking.
+- Development of a mobile app for pilgrims with QR, maps, and booking.
 - Admin dashboard with live analytics, charts, and AI alerts.
 - Offline-first mode for low-connectivity areas.
 
 ### 🕹️ Smart Features
 - AR-guided temple tours for interactive navigation.
 - UPI-based smart donations and transparent transaction logs.
-- Multilingual support (Hindi, Gujarati, English).
+- Multilingual support (Hindi, English).
 - Priority lanes for elderly and differently-abled devotees.
 - Emergency SOS integration with GPS tracking and notifications.
 
 ### 🧭 Integrations & Expansion
-- Partnership with Gujarat Tourism and Temple Boards for unified bookings.
-- Multi-location support for Somnath, Dwarka, Ambaji, and Pavagadh.
+- Partnership with Tourism and Temple Boards for unified bookings.
+- Multi-location support for Bakey Bihari, radharaman, Radhavallabh, Braj.
 - Expansion into smart parking and mobility systems (auto slot assignment, EV charging).
 - Cloud-based hosting and scalability for festival surges.
 - Integration with Google Maps and weather APIs for crowd-aware routing.
