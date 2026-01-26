@@ -1,7 +1,7 @@
 # 🛕 DevDhamPath – Smart Temple & Pilgrimage Management System
 
 ## 🧠 Overview
-**DevDhamPath** is an **IoT and AI-based integrated system** designed to manage crowds, parking, and pilgrim experiences at large temples and pilgrimage sites efficiently and safely.  
+**DevDhamPath** is an AI-based integrated system** designed to manage crowds, parking, and pilgrim experiences at large temples and pilgrimage sites efficiently and safely.  
 The system enables **intelligent time-slot allocation, QR-based entry/exit, Aadhaar verification**, **Aarti booking with online payment**, and **real-time monitoring** using IoT sensors, camera feeds, and aerial drones.
 
 ---
